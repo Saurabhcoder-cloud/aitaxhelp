@@ -10,6 +10,7 @@ import PricingSection from '../components/PricingSection';
 import ContactSection from '../components/ContactSection';
 import Footer from '../components/Footer';
 import TaxNewsSection from '../components/TaxNewsSection';
+import AiTaxLawMonitorSection from '../components/AiTaxLawMonitorSection';
 
 export default function Home() {
   const [currentLanguage, setCurrentLanguage] = useState('en');
@@ -23,6 +24,7 @@ export default function Home() {
       <HeroSection />
       <FeaturesSection />
       <HowItWorksSection />
+      <AiTaxLawMonitorSection />
       <PricingSection currentLanguage={currentLanguage} />
       <TaxNewsSection />
       <ContactSection />

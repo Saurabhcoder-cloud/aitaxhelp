@@ -1,0 +1,28 @@
+// Prisma schema for TaxHelp AI
+// Uses SQLite for local development
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model TaxUpdate {
+  id            String   @id @default(cuid())
+  date          DateTime
+  jurisdiction  String
+  title         String
+  summary       String
+  sourceUrl     String
+  impactType    String
+  languageCode  String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([jurisdiction])
+  @@index([languageCode])
+  @@unique([date, jurisdiction, title, languageCode], name: "date_jurisdiction_title_languageCode")
+}
