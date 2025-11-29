@@ -6,7 +6,7 @@ interface MailingAddressInfoProps {
   selectedState: string;
 }
 
-const stateMailingAddresses: { [key: string]: { name: string; address: string } } = {
+export const stateMailingAddresses: { [key: string]: { name: string; address: string } } = {
   AL: { name: "Alabama Department of Revenue", address: "Individual and Corporate Tax Division, P.O. Box 327480, Montgomery, AL 36132-7480" },
   AK: { name: "Alaska Department of Revenue", address: "No state income tax - no filing required" },
   AZ: { name: "Arizona Department of Revenue", address: "P.O. Box 52016, Phoenix, AZ 85072-2016" },
@@ -59,7 +59,7 @@ const stateMailingAddresses: { [key: string]: { name: string; address: string } 
   WY: { name: "Wyoming Department of Revenue", address: "No state income tax - no filing required" }
 };
 
-const irsMailingAddresses: { [key: string]: string } = {
+export const irsMailingAddresses: { [key: string]: string } = {
   AL: "Department of the Treasury, Internal Revenue Service, Austin, TX 73301-0002",
   AK: "Department of the Treasury, Internal Revenue Service, Fresno, CA 93888-0002",
   AZ: "Department of the Treasury, Internal Revenue Service, Fresno, CA 93888-0002",

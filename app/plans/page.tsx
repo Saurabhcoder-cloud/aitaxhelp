@@ -10,15 +10,16 @@ export default function PlansPage() {
 
   const plans = [
     {
-      name: 'Registration Fee',
+      name: 'Lifetime Registration',
       price: '$9.99',
-      period: 'One-Time Registration Fee',
-      description: 'This is a one-time registration fee that gives the client lifetime access to the website and its features. After paying this fee once, the client can use the website every year to prepare their tax return without any renewal or subscription charges.',
+      period: 'One-time registration payment',
+      description:
+        'One-time registration fee for TaxAIHelp. Pay once, use the website for life. No monthly or annual subscription. You only pay again when you prepare a tax return.',
       features: [
-        'Lifetime website access',
-        'No renewal charges',
-        'Use every tax season',
-        'Basic support included',
+        'Lifetime access after a single $9.99 payment',
+        'Clear one-time registration',
+        'Use the website every tax season',
+        'No recurring billing ever',
         'Secure account setup'
       ],
       popular: false,
@@ -27,17 +28,17 @@ export default function PlansPage() {
       icon: 'ri-user-add-line'
     },
     {
-      name: 'Individual Tax Return',
+      name: 'Single Tax Return (Individual)',
       price: '$19.99',
-      period: 'Per Filing',
-      description: 'Fee for preparing a tax return for a single individual (one client filing only for themselves). The client pays this fee only once per year, when they prepare their tax return. There are no monthly or annual subscription payments.',
+      period: 'Fee per complete return',
+      description:
+        'Fee for preparing ONE complete tax return for one client filing only for themselves. Includes federal and state return preparation for one individual (e.g., Form 1040 and the appropriate state forms). This fee is paid only when the client prepares a tax return (usually once per year).',
       features: [
-        'Single individual filing',
-        'Federal tax return',
-        'State tax return',
-        'Tax law guidance',
-        'Filing address provided',
-        'One-time annual payment'
+        'Covers one individual federal and state filing',
+        'Ideal for Form 1040 with the right state forms',
+        'Uses TaxAIHelp calculation engine',
+        'Pay when you file (typically once yearly)',
+        'Clear per-return pricing'
       ],
       popular: true,
       buttonText: 'File Individual Return',
@@ -45,17 +46,17 @@ export default function PlansPage() {
       icon: 'ri-user-line'
     },
     {
-      name: 'Family Tax Return',
+      name: 'Family Tax Return (Married Couple)',
       price: '$24.99',
-      period: 'Per Filing',
-      description: 'Fee for preparing a tax return for a married couple (husband and wife filing together). This is referred to as a "family return." The client pays this fee once per year, when they prepare a joint tax return.',
+      period: 'Family return (husband and wife)',
+      description:
+        'Fee for preparing ONE complete tax return for a husband and wife / married couple filing together (joint return). Includes federal and state return preparation for the married couple. This fee is paid only when the couple prepares a tax return (usually once per year).',
       features: [
-        'Married couple filing',
-        'Joint tax return',
-        'Federal and state filing',
-        'Family tax guidance',
-        'Filing addresses provided',
-        'One-time annual payment'
+        'Joint return for married couples',
+        'Federal and state filings included',
+        'No monthly or annual subscriptions',
+        'Pay per joint return you file',
+        'Family-focused support'
       ],
       popular: false,
       buttonText: 'File Family Return',
@@ -139,14 +140,14 @@ export default function PlansPage() {
 
           <div className="mt-16 text-center">
             <div className="text-center mb-4">
-              <p className="text-gray-600 font-medium">
-                👉 You only pay when filing your tax return — no monthly or annual charges.
+              <p className="text-gray-700 font-medium max-w-3xl mx-auto">
+                You do NOT pay monthly or annually. You pay a one-time $9.99 registration fee and then only pay when you prepare a tax return (once a year in most cases).
               </p>
             </div>
 
             {/* Payment Methods */}
             <div className="text-center">
-              <p className="text-gray-600 mb-4">We accept:</p>
+              <p className="text-gray-700 mb-4 font-medium">We accept Visa, Mastercard, and Discover.</p>
               <div className="flex justify-center items-center space-x-6">
                 <div className="flex items-center space-x-2">
                   <div className="w-12 h-8 bg-blue-600 rounded flex items-center justify-center">

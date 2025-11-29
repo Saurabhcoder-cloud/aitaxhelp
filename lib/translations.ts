@@ -289,8 +289,8 @@ export const translations = {
       },
       info: {
         title: 'Contact Information',
-        address: '123 Tax Street, Finance District, New York, NY 10001',
-        phone: '+1 (555) 123-4567',
+        address: '1000 4Th, office #410, San Rafael, CA 94901, USA',
+        phone: 'Tel: (415) 250 3828',
         email: 'support@taxhelp.ai',
         hours: 'Monday - Friday: 9:00 AM - 6:00 PM EST'
       },
@@ -639,8 +639,8 @@ export const translations = {
       },
       info: {
         title: 'Información de Contacto',
-        address: '123 Tax Street, Distrito Financiero, Nueva York, NY 10001',
-        phone: '+1 (555) 123-4567',
+        address: '1000 4Th, office #410, San Rafael, CA 94901, USA',
+        phone: 'Tel: (415) 250 3828',
         email: 'support@taxhelp.ai',
         hours: 'Lunes - Viernes: 9:00 AM - 6:00 PM EST'
       },
@@ -1689,8 +1689,8 @@ export const translations = {
       },
       info: {
         title: 'Контактная информация',
-        address: '123 Tax Street, Финансовый район, Нью-Йорк, NY 10001',
-        phone: '+1 (555) 123-4567',
+        address: '1000 4Th, office #410, San Rafael, CA 94901, USA',
+        phone: 'Tel: (415) 250 3828',
         email: 'support@taxhelp.ai',
         hours: 'Понедельник - Пятница: 9:00 AM - 6:00 PM EST'
       },

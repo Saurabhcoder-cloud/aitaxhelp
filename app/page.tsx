@@ -23,7 +23,7 @@ export default function Home() {
       <HeroSection />
       <FeaturesSection />
       <HowItWorksSection />
-      <PricingSection />
+      <PricingSection currentLanguage={currentLanguage} />
       <TaxNewsSection />
       <ContactSection />
       <Footer />
