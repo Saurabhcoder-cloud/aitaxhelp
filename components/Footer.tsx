@@ -1,8 +1,14 @@
 'use client';
 
+import type { Dispatch, SetStateAction } from 'react';
 import Link from 'next/link';
 
-export default function Footer() {
+interface FooterProps {
+  currentLanguage?: string;
+  setCurrentLanguage?: Dispatch<SetStateAction<string>>;
+}
+
+export default function Footer({ currentLanguage, setCurrentLanguage }: FooterProps = {}) {
   return (
     <footer className="bg-gray-900 text-white">
       {/* Newsletter Section */}
