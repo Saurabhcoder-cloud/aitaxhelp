@@ -16,77 +16,20 @@ interface NewsItem {
 export default function TaxNewsSection() {
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    // Simulate fetching daily tax news updates
-    const fetchTaxNews = () => {
-      const mockNews: NewsItem[] = [
-        {
-          id: '1',
-          date: new Date().toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          }),
-          headline: 'IRS Extends Tax Filing Deadline for Disaster-Affected Areas',
-          summary: 'The Internal Revenue Service announced an extension of tax filing and payment deadlines for taxpayers in federally declared disaster areas. Affected individuals and businesses now have additional time to file their returns.',
-          source: 'IRS',
-          category: 'federal'
-        },
-        {
-          id: '2',
-          date: new Date(Date.now() - 86400000).toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          }),
-          headline: 'New Standard Deduction Amounts for 2024 Tax Year',
-          summary: 'The IRS has announced inflation adjustments for tax year 2024, including increased standard deduction amounts. Single filers can now deduct $14,600, while married filing jointly can deduct $29,200.',
-          source: 'IRS',
-          category: 'federal'
-        },
-        {
-          id: '3',
-          date: new Date(Date.now() - 172800000).toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          }),
-          headline: 'California Updates State Tax Withholding Tables',
-          summary: 'California Franchise Tax Board has released updated withholding tables for 2024. Employers should implement these changes to ensure proper state tax withholding from employee paychecks.',
-          source: 'California FTB',
-          category: 'state'
-        },
-        {
-          id: '4',
-          date: new Date(Date.now() - 259200000).toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          }),
-          headline: 'Congress Considers Changes to Child Tax Credit',
-          summary: 'Bipartisan legislation in Congress proposes modifications to the Child Tax Credit, potentially expanding eligibility and increasing credit amounts for qualifying families.',
-          source: 'U.S. Congress',
-          category: 'federal'
-        },
-        {
-          id: '5',
-          date: new Date(Date.now() - 345600000).toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          }),
-          headline: 'IRS Warns of Increased Tax Scam Activity',
-          summary: 'The IRS issued a consumer alert about sophisticated tax-related scams targeting taxpayers through phone calls, emails, and text messages. Taxpayers are advised to verify any IRS communication through official channels.',
-          source: 'IRS',
-          category: 'general'
-        }
-      ];
-
-      setTimeout(() => {
-        setNewsItems(mockNews);
+    const fetchTaxNews = async () => {
+      try {
+        const response = await fetch('/api/tax-news');
+        const data = await response.json();
+        setNewsItems(data.news || []);
+      } catch (err) {
+        console.error('Error loading tax news', err);
+        setError('Unable to load tax news right now.');
+      } finally {
         setLoading(false);
-      }, 1000);
+      }
     };
 
     fetchTaxNews();
@@ -140,6 +83,12 @@ export default function TaxNewsSection() {
           </p>
         </div>
 
+        {error && (
+          <div className="max-w-3xl mx-auto mb-6 bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg text-sm text-center">
+            {error}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
           {newsItems.slice(0, 6).map((item) => (
             <div key={item.id} className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden">
@@ -190,9 +139,8 @@ export default function TaxNewsSection() {
             <div>
               <h4 className="font-semibold text-yellow-800 mb-2">Important Disclaimer</h4>
               <p className="text-yellow-700 text-sm">
-                These updates are for informational purposes only and do not constitute legal or tax advice. 
-                Please consult a qualified tax professional or official government sources for specific guidance 
-                regarding your tax situation.
+                These news summaries are for informational purposes only and do not constitute legal or tax advice.
+                Please consult a qualified tax professional or official government sources for specific guidance regarding your tax situation.
               </p>
             </div>
           </div>

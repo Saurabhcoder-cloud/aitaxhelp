@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import FileUpload from '@/components/FileUpload';
@@ -9,6 +9,7 @@ import TaxFormBuilder from '@/components/TaxFormBuilder';
 import StateSelector from '@/components/StateSelector';
 import TaxLawGuidance from '@/components/TaxLawGuidance';
 import { translations } from '@/lib/translations';
+import { irsMailingAddresses, stateMailingAddresses } from '@/components/MailingAddressInfo';
 
 export default function FileTaxesPage() {
   const [currentLanguage, setCurrentLanguage] = useState('en');
@@ -17,6 +18,15 @@ export default function FileTaxesPage() {
   const [selectedState, setSelectedState] = useState('');
 
   const t = translations[currentLanguage];
+  const stateAddressInfo = selectedState ? stateMailingAddresses[selectedState] : null;
+  const irsAddress = selectedState ? irsMailingAddresses[selectedState] : null;
+
+  useEffect(() => {
+    const savedState = typeof window !== 'undefined' ? localStorage.getItem('userState') : null;
+    if (savedState) {
+      setSelectedState(savedState);
+    }
+  }, []);
 
   const steps = [
     { id: 1, title: t.fileTaxes.uploadDocuments, icon: 'ri-upload-cloud-line' },
@@ -283,27 +293,32 @@ export default function FileTaxesPage() {
                         <i className="ri-government-line text-blue-600 text-2xl"></i>
                         <h3 className="font-semibold text-blue-800">Federal Tax Return</h3>
                       </div>
-                      <p className="text-sm text-blue-700">
-                        Internal Revenue Service<br/>
-                        1973 N Rulon White Blvd<br/>
-                        Ogden, UT 84404
+                      <p className="text-sm text-blue-700 font-mono leading-relaxed">
+                        {irsAddress || 'Select your state to view the correct IRS mailing address.'}
                       </p>
                     </div>
-                    
+
                     <div className="bg-green-50 border border-green-200 rounded-lg p-6">
                       <div className="flex items-center space-x-3 mb-4">
                         <i className="ri-map-pin-line text-green-600 text-2xl"></i>
                         <h3 className="font-semibold text-green-800">State Tax Return ({selectedState})</h3>
                       </div>
-                      <p className="text-sm text-green-700">
-                        {selectedState === 'CA' && 'Franchise Tax Board, PO Box 942840, Sacramento, CA 94240-0040'}
-                        {selectedState === 'NY' && 'NYS Tax Department, Processing Center, PO Box 61000, Albany, NY 12261-0001'}
-                        {(selectedState === 'TX' || selectedState === 'FL') && 'No state income tax return required'}
-                        {!['CA', 'NY', 'TX', 'FL'].includes(selectedState) && 'State tax office address will be provided based on your selected state'}
+                      <p className="text-sm text-green-700 font-mono leading-relaxed">
+                        {stateAddressInfo ? stateAddressInfo.address : 'State tax office address will be provided based on your selected state'}
                       </p>
                     </div>
                   </div>
                 )}
+
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6 text-left">
+                  <h4 className="font-semibold text-gray-900 mb-2 flex items-center">
+                    <i className="ri-alert-line text-yellow-600 mr-2"></i>
+                    Verify Before Mailing
+                  </h4>
+                  <p className="text-sm text-gray-700">
+                    Always double-check the mailing address on the official IRS/state website before sending.
+                  </p>
+                </div>
 
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
                   <div className="flex items-start space-x-3">

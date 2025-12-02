@@ -6,9 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "taxjob": "ts-node scripts/runDailyTaxUpdateJob.ts"
   },
   "dependencies": {
+    "@prisma/client": "^5.21.1",
     "react": "^18",
     "react-dom": "^18",
     "next": "14.2.16",
@@ -29,6 +31,8 @@
     "socket.io-client": "^4.7.4"
   },
   "devDependencies": {
+    "prisma": "^5.21.1",
+    "ts-node": "^10.9.2",
     "eslint": "^8",
     "eslint-config-next": "14.2.16",
     "@types/bcryptjs": "^2.4.6",

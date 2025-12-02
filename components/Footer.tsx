@@ -1,8 +1,14 @@
 'use client';
 
+import type { Dispatch, SetStateAction } from 'react';
 import Link from 'next/link';
 
-export default function Footer() {
+interface FooterProps {
+  currentLanguage?: string;
+  setCurrentLanguage?: Dispatch<SetStateAction<string>>;
+}
+
+export default function Footer({ currentLanguage, setCurrentLanguage }: FooterProps = {}) {
   return (
     <footer className="bg-gray-900 text-white">
       {/* Newsletter Section */}
@@ -137,14 +143,14 @@ export default function Footer() {
                 <li className="flex items-start">
                   <i className="ri-map-pin-line text-blue-400 mr-3 mt-1"></i>
                   <span className="text-gray-300">
-                    1000 4Th, Office #410,<br />
+                    1000 4Th, office #410,<br />
                     San Rafael, CA 94901, USA
                   </span>
                 </li>
                 <li className="flex items-center">
                   <i className="ri-phone-line text-blue-400 mr-3"></i>
                   <a href="tel:+14152503828" className="text-gray-300 hover:text-white transition-colors cursor-pointer">
-                    (415) 250-3828
+                    Tel: (415) 250 3828
                   </a>
                 </li>
                 <li className="flex items-center">
@@ -181,7 +187,7 @@ export default function Footer() {
                 </Link>
               </div>
               <div className="text-xs text-gray-500 text-center md:text-right">
-                The intellectual property used in creating this website is protected in accordance with U.S. law.
+                The intellectual property used when creating this site is protected in accordance with U.S. law.
               </div>
             </div>
           </div>

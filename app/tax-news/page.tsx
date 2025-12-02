@@ -19,94 +19,20 @@ export default function TaxNews() {
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const fetchTaxNews = () => {
-      const mockNews: NewsItem[] = [
-        {
-          id: '1',
-          date: new Date().toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          }),
-          headline: 'IRS Extends Tax Filing Deadline for Disaster-Affected Areas',
-          summary: 'The Internal Revenue Service announced an extension of tax filing and payment deadlines for taxpayers in federally declared disaster areas. Affected individuals and businesses now have additional time to file their returns.',
-          fullContent: 'The Internal Revenue Service has announced relief measures for taxpayers affected by recent natural disasters. This extension applies to both individual and business tax returns, as well as estimated tax payments. Taxpayers in affected areas should check the IRS website for specific deadline extensions applicable to their location.',
-          source: 'IRS',
-          category: 'federal'
-        },
-        {
-          id: '2',
-          date: new Date(Date.now() - 86400000).toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          }),
-          headline: 'New Standard Deduction Amounts for 2024 Tax Year',
-          summary: 'The IRS has announced inflation adjustments for tax year 2024, including increased standard deduction amounts. Single filers can now deduct $14,600, while married filing jointly can deduct $29,200.',
-          fullContent: 'The annual inflation adjustments affect numerous tax provisions for tax year 2024. In addition to standard deduction increases, the tax brackets have also been adjusted upward. These changes help prevent bracket creep and maintain the real value of tax benefits.',
-          source: 'IRS',
-          category: 'federal'
-        },
-        {
-          id: '3',
-          date: new Date(Date.now() - 172800000).toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          }),
-          headline: 'California Updates State Tax Withholding Tables',
-          summary: 'California Franchise Tax Board has released updated withholding tables for 2024. Employers should implement these changes to ensure proper state tax withholding from employee paychecks.',
-          fullContent: 'The updated withholding tables reflect changes in California state tax rates and brackets. Employers have 60 days to implement the new tables. Employees may need to submit new Form DE 4 if their withholding preferences have changed.',
-          source: 'California FTB',
-          category: 'state'
-        },
-        {
-          id: '4',
-          date: new Date(Date.now() - 259200000).toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          }),
-          headline: 'Congress Considers Changes to Child Tax Credit',
-          summary: 'Bipartisan legislation in Congress proposes modifications to the Child Tax Credit, potentially expanding eligibility and increasing credit amounts for qualifying families.',
-          fullContent: 'The proposed legislation would restore the enhanced Child Tax Credit provisions that were temporarily in effect. This includes increasing the credit amount and making it fully refundable for more families. The bill has support from both parties but faces challenges in the current legislative environment.',
-          source: 'U.S. Congress',
-          category: 'federal'
-        },
-        {
-          id: '5',
-          date: new Date(Date.now() - 345600000).toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          }),
-          headline: 'IRS Warns of Increased Tax Scam Activity',
-          summary: 'The IRS issued a consumer alert about sophisticated tax-related scams targeting taxpayers through phone calls, emails, and text messages. Taxpayers are advised to verify any IRS communication through official channels.',
-          fullContent: 'Scammers are using increasingly sophisticated methods to impersonate IRS agents and steal personal information. The IRS reminds taxpayers that they will never initiate contact by phone, email, or text message to request personal or financial information. All legitimate IRS communications come through official mail.',
-          source: 'IRS',
-          category: 'general'
-        },
-        {
-          id: '6',
-          date: new Date(Date.now() - 432000000).toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          }),
-          headline: 'New York State Implements Digital Tax Filing Requirements',
-          summary: 'New York State has announced new requirements for digital tax filing, affecting both individual and business taxpayers. The changes aim to streamline the filing process and reduce processing times.',
-          fullContent: 'The New York State Department of Taxation and Finance has implemented new digital filing requirements to modernize tax administration. These changes include mandatory electronic filing for certain taxpayers and enhanced security measures for online submissions.',
-          source: 'NY State Tax Dept',
-          category: 'state'
-        }
-      ];
-
-      setTimeout(() => {
-        setNewsItems(mockNews);
+    const fetchTaxNews = async () => {
+      try {
+        const response = await fetch('/api/tax-news');
+        const data = await response.json();
+        setNewsItems(data.news || []);
+      } catch (err) {
+        console.error('Unable to load tax news', err);
+        setError('Unable to load tax news right now.');
+      } finally {
         setLoading(false);
-      }, 1000);
+      }
     };
 
     fetchTaxNews();
@@ -220,6 +146,12 @@ export default function TaxNews() {
             ))}
           </div>
 
+          {error && (
+            <div className="max-w-3xl mx-auto mb-8 bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg text-center text-sm">
+              {error}
+            </div>
+          )}
+
           {loading ? (
             <div className="text-center py-20">
               <i className="ri-loader-4-line animate-spin text-4xl text-blue-600 mb-4"></i>
@@ -264,17 +196,17 @@ export default function TaxNews() {
 
           {/* Disclaimer */}
           <div className="mt-16 bg-yellow-50 border border-yellow-200 rounded-lg p-8">
-            <div className="flex items-start">
-              <i className="ri-information-line text-yellow-600 mr-4 mt-1 text-xl"></i>
-              <div>
-                <h3 className="font-bold text-yellow-800 mb-3 text-lg">Important Disclaimer</h3>
-                <p className="text-yellow-700">
-                  These updates are for informational purposes only and do not constitute legal or tax advice. 
-                  Please consult a qualified tax professional or official government sources for specific guidance 
-                  regarding your tax situation. Always verify information with official IRS and state tax authority websites.
-                </p>
+              <div className="flex items-start">
+                <i className="ri-information-line text-yellow-600 mr-4 mt-1 text-xl"></i>
+                <div>
+                  <h3 className="font-bold text-yellow-800 mb-3 text-lg">Important Disclaimer</h3>
+                  <p className="text-yellow-700">
+                    These news summaries are for informational purposes only and do not constitute legal or tax advice.
+                    Please consult a qualified tax professional or official government sources for specific guidance
+                    regarding your tax situation. Always verify information with official IRS and state tax authority websites.
+                  </p>
+                </div>
               </div>
-            </div>
           </div>
         </div>
       </section>
