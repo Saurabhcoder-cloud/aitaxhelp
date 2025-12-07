@@ -5,6 +5,7 @@ import { useState } from 'react';
 import Header from '../components/Header';
 import HeroSection from '../components/HeroSection';
 import WhyDifferentSection from '../components/WhyDifferentSection';
+import SupportedTaxFormsSection from '../components/SupportedTaxFormsSection';
 import FeaturesSection from '../components/FeaturesSection';
 import HowItWorksSection from '../components/HowItWorksSection';
 import PricingSection from '../components/PricingSection';
@@ -23,6 +24,7 @@ export default function Home() {
       />
       <HeroSection currentLanguage={currentLanguage} />
       <WhyDifferentSection />
+      <SupportedTaxFormsSection />
       <FeaturesSection />
       <HowItWorksSection />
       <PricingSection />
