@@ -6,151 +6,158 @@ interface HowItWorksSectionProps {
 
 const translations = {
   en: {
-    title: "How It Works",
-    subtitle: "Get your taxes done in 3 simple steps",
+    title: "How It Works — File Your Taxes in 3 Simple Steps",
+    subtitle: "File your taxes with guided AI support in minutes.",
     steps: [
       {
-        title: "Upload Documents",
-        description: "Securely upload your tax documents (W-2, 1099, receipts) using our encrypted platform.",
+        title: "1. Upload Documents",
+        description: "Upload your W-2, 1099s, receipts, or statements using our encrypted platform.",
         icon: "ri-upload-cloud-2-line"
       },
       {
-        title: "AI Processing",
-        description: "Our advanced AI extracts data, validates information, and calculates your taxes automatically.",
+        title: "2. AI Processing",
+        description: "Our AI reads your documents, validates information, applies deductions, and calculates your tax return automatically.",
         icon: "ri-robot-line"
       },
       {
-        title: "Review & File",
-        description: "Review your completed tax return, make any adjustments, and file directly with tax authorities.",
+        title: "3. Review & File",
+        description: "Preview your completed tax return, make adjustments if needed, and file with federal and state authorities.",
         icon: "ri-file-check-line"
       }
-    ]
+    ],
+    ctaLabel: "Start Filing Now"
   },
   es: {
     title: "Cómo Funciona",
-    subtitle: "Completa tus impuestos en 3 simples pasos",
+    subtitle: "Presenta tus impuestos con ayuda de IA en minutos.",
     steps: [
       {
-        title: "Subir Documentos",
-        description: "Sube de forma segura tus documentos fiscales (W-2, 1099, recibos) usando nuestra plataforma encriptada.",
+        title: "1. Subir Documentos",
+        description: "Sube tu W-2, 1099s, recibos o estados de cuenta usando nuestra plataforma encriptada.",
         icon: "ri-upload-cloud-2-line"
       },
       {
-        title: "Procesamiento IA",
-        description: "Nuestra IA avanzada extrae datos, valida información y calcula tus impuestos automáticamente.",
+        title: "2. Procesamiento IA",
+        description: "Nuestra IA lee tus documentos, valida la información, aplica deducciones y calcula tu declaración automáticamente.",
         icon: "ri-robot-line"
       },
       {
-        title: "Revisar y Presentar",
-        description: "Revisa tu declaración de impuestos completada, haz ajustes y presenta directamente a las autoridades fiscales.",
+        title: "3. Revisar y Presentar",
+        description: "Previsualiza tu declaración de impuestos, haz ajustes si es necesario y presenta a las autoridades federales y estatales.",
         icon: "ri-file-check-line"
       }
-    ]
+    ],
+    ctaLabel: "Comenzar a Declarar"
   },
   fr: {
     title: "Comment Ça Marche",
-    subtitle: "Faites vos impôts en 3 étapes simples",
+    subtitle: "Déclarez vos impôts avec l'aide de l'IA en quelques minutes.",
     steps: [
       {
-        title: "Télécharger Documents",
-        description: "Téléchargez en toute sécurité vos documents fiscaux (W-2, 1099, reçus) en utilisant notre plateforme cryptée.",
+        title: "1. Télécharger les Documents",
+        description: "Téléchargez vos W-2, 1099, reçus ou relevés sur notre plateforme chiffrée.",
         icon: "ri-upload-cloud-2-line"
       },
       {
-        title: "Traitement IA",
-        description: "Notre IA avancée extrait les données, valide les informations et calcule vos impôts automatiquement.",
+        title: "2. Traitement par l'IA",
+        description: "Notre IA lit vos documents, valide les informations, applique les déductions et calcule automatiquement votre déclaration fiscale.",
         icon: "ri-robot-line"
       },
       {
-        title: "Réviser et Déposer",
-        description: "Révisez votre déclaration fiscale complétée, apportez des ajustements et déposez directement auprès des autorités fiscales.",
+        title: "3. Vérifier et Déposer",
+        description: "Prévisualisez votre déclaration, apportez des ajustements si besoin et déposez auprès des autorités fédérales et étatiques.",
         icon: "ri-file-check-line"
       }
-    ]
+    ],
+    ctaLabel: "Commencer la déclaration"
   },
   ar: {
     title: "كيف يعمل",
-    subtitle: "أنجز ضرائبك في 3 خطوات بسيطة",
+    subtitle: "قدّم ضرائبك بدعم من الذكاء الاصطناعي في دقائق.",
     steps: [
       {
-        title: "رفع المستندات",
-        description: "ارفع مستنداتك الضريبية بأمان (W-2، 1099، الإيصالات) باستخدام منصتنا المشفرة.",
+        title: "1. رفع المستندات",
+        description: "ارفع نموذج W-2 أو 1099 أو الإيصالات أو الكشوف باستخدام منصتنا المشفرة.",
         icon: "ri-upload-cloud-2-line"
       },
       {
-        title: "معالجة الذكاء الاصطناعي",
-        description: "يستخرج الذكاء الاصطناعي المتقدم لدينا البيانات ويتحقق من المعلومات ويحسب ضرائبك تلقائياً.",
+        title: "2. معالجة الذكاء الاصطناعي",
+        description: "يقرأ الذكاء الاصطناعي المستندات، يتحقق من المعلومات، يطبق الخصومات ويحسب إقرارك الضريبي تلقائياً.",
         icon: "ri-robot-line"
       },
       {
-        title: "مراجعة وتقديم",
-        description: "راجع إقرارك الضريبي المكتمل، قم بأي تعديلات، وقدم مباشرة إلى السلطات الضريبية.",
+        title: "3. المراجعة والتقديم",
+        description: "عاين إقرارك الضريبي المكتمل، أجرِ التعديلات عند الحاجة، وقدّم إلى السلطات الفيدرالية والولائية.",
         icon: "ri-file-check-line"
       }
-    ]
+    ],
+    ctaLabel: "ابدأ التقديم الآن"
   },
   ru: {
     title: "Как Это Работает",
-    subtitle: "Сделайте свои налоги за 3 простых шага",
+    subtitle: "Подавайте налоги с помощью ИИ за считанные минуты.",
     steps: [
       {
-        title: "Загрузить Документы",
-        description: "Безопасно загрузите ваши налоговые документы (W-2, 1099, чеки) используя нашу зашифрованную платформу.",
+        title: "1. Загрузите документы",
+        description: "Загрузите W-2, 1099, квитанции или выписки на нашей зашифрованной платформе.",
         icon: "ri-upload-cloud-2-line"
       },
       {
-        title: "Обработка ИИ",
-        description: "Наш продвинутый ИИ извлекает данные, проверяет информацию и рассчитывает ваши налоги автоматически.",
+        title: "2. Обработка ИИ",
+        description: "ИИ считывает документы, проверяет данные, применяет вычеты и автоматически рассчитывает налоговую декларацию.",
         icon: "ri-robot-line"
       },
       {
-        title: "Проверить и Подать",
-        description: "Проверьте вашу завершенную налоговую декларацию, внесите корректировки и подайте напрямую в налоговые органы.",
+        title: "3. Проверка и подача",
+        description: "Просмотрите готовую декларацию, внесите правки при необходимости и подайте в федеральные и региональные органы.",
         icon: "ri-file-check-line"
       }
-    ]
+    ],
+    ctaLabel: "Начать подачу сейчас"
   },
   zh: {
     title: "工作原理",
-    subtitle: "通过3个简单步骤完成您的税务",
+    subtitle: "在几分钟内完成 AI 引导的报税。",
     steps: [
       {
-        title: "上传文档",
-        description: "使用我们的加密平台安全上传您的税务文档（W-2、1099、收据）。",
+        title: "1. 上传文档",
+        description: "在我们的加密平台上传您的 W-2、1099、收据或对账单。",
         icon: "ri-upload-cloud-2-line"
       },
       {
-        title: "AI处理",
-        description: "我们先进的AI提取数据、验证信息并自动计算您的税款。",
+        title: "2. AI 处理",
+        description: "我们的 AI 读取文档，验证信息，应用扣除并自动计算您的报税表。",
         icon: "ri-robot-line"
       },
       {
-        title: "审查和申报",
-        description: "审查您完成的税务申报，进行任何调整，并直接向税务机关申报。",
+        title: "3. 审核和申报",
+        description: "预览完成的报税表，按需调整，并提交给联邦和州税务机构。",
         icon: "ri-file-check-line"
       }
-    ]
+    ],
+    ctaLabel: "立即开始报税"
   },
   hi: {
     title: "यह कैसे काम करता है",
-    subtitle: "3 सरल चरणों में अपने कर पूरे करें",
+    subtitle: "कुछ ही मिनटों में AI सहायता के साथ टैक्स भरें।",
     steps: [
       {
-        title: "दस्तावेज़ अपलोड करें",
-        description: "हमारे एन्क्रिप्टेड प्लेटफॉर्म का उपयोग करके अपने कर दस्तावेज़ (W-2, 1099, रसीदें) सुरक्षित रूप से अपलोड करें।",
+        title: "1. दस्तावेज़ अपलोड करें",
+        description: "हमारे एन्क्रिप्टेड प्लेटफ़ॉर्म पर अपना W-2, 1099s, रसीदें या स्टेटमेंट अपलोड करें।",
         icon: "ri-upload-cloud-2-line"
       },
       {
-        title: "AI प्रसंस्करण",
-        description: "हमारी उन्नत AI डेटा निकालती है, जानकारी को सत्यापित करती है, और आपके करों की स्वचालित रूप से गणना करती है।",
+        title: "2. AI प्रोसेसिंग",
+        description: "हमारा AI आपके दस्तावेज़ पढ़ता है, जानकारी को सत्यापित करता है, कटौतियाँ लागू करता है और स्वतः कर रिटर्न गणना करता है।",
         icon: "ri-robot-line"
       },
       {
-        title: "समीक्षा और फाइल करें",
-        description: "अपने पूर्ण कर रिटर्न की समीक्षा करें, कोई भी समायोजन करें, और सीधे कर अधिकारियों के साथ फाइल करें।",
+        title: "3. समीक्षा और फाइल करें",
+        description: "अपना तैयार कर रिटर्न देखें, ज़रूरत हो तो बदलाव करें, और संघीय व राज्य अधिकारियों के साथ फाइल करें।",
         icon: "ri-file-check-line"
       }
-    ]
+    ],
+    ctaLabel: "अभी फाइलिंग शुरू करें"
   }
 };
 
@@ -185,6 +192,12 @@ export default function HowItWorksSection({ currentLanguage }: HowItWorksSection
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="mt-12 text-center">
+          <button className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-full shadow hover:bg-blue-700 transition">
+            {t.ctaLabel}
+          </button>
         </div>
 
         <div className="mt-16 text-center">
