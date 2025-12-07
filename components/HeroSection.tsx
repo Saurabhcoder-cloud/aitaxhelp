@@ -9,64 +9,85 @@ interface HeroSectionProps {
 
 const translations = {
   en: {
-    title: "AI-Powered Global Tax Filing Made Simple",
-    subtitle: "Automate your tax filing process with advanced AI technology. Upload documents, get instant calculations, and file with confidence.",
-    uploadBtn: "Upload Your Tax Documents",
-    startBtn: "Start Free",
+    title: "AI-Powered Tax Filing for Everyone — Simple, Accurate, Affordable",
+    subtitle:
+      "File your taxes with a multilingual AI assistant designed for gig workers, families, seniors, immigrants, and low-income households.",
+    supportLine:
+      "Upload your W-2, 1099, or receipts — get instant calculations — file with confidence.",
+    uploadBtn: "Start Filing Now",
+    startBtn: "Upload Tax Documents",
     dragText: "Drag & drop your tax documents here or click to browse",
     supportedFiles: "Supports PDF, JPG, PNG (Max 10MB)",
     features: ["Bank-level Security", "Global Coverage", "24/7 Support"]
   },
   es: {
-    title: "Declaración de Impuestos Global con IA Simplificada",
-    subtitle: "Automatiza tu proceso de declaración de impuestos con tecnología de IA avanzada. Sube documentos, obtén cálculos instantáneos y presenta con confianza.",
-    uploadBtn: "Subir Documentos Fiscales",
-    startBtn: "Comenzar Gratis",
+    title: "AI-Powered Tax Filing for Everyone — Simple, Accurate, Affordable",
+    subtitle:
+      "File your taxes with a multilingual AI assistant designed for gig workers, families, seniors, immigrants, and low-income households.",
+    supportLine:
+      "Upload your W-2, 1099, or receipts — get instant calculations — file with confidence.",
+    uploadBtn: "Start Filing Now",
+    startBtn: "Upload Tax Documents",
     dragText: "Arrastra y suelta tus documentos fiscales aquí o haz clic para navegar",
     supportedFiles: "Soporta PDF, JPG, PNG (Máx 10MB)",
     features: ["Seguridad Bancaria", "Cobertura Global", "Soporte 24/7"]
   },
   fr: {
-    title: "Déclaration Fiscale Mondiale IA Simplifiée",
-    subtitle: "Automatisez votre processus de déclaration fiscale avec une technologie IA avancée. Téléchargez des documents, obtenez des calculs instantanés et déclarez en toute confiance.",
-    uploadBtn: "Télécharger Documents Fiscaux",
-    startBtn: "Commencer Gratuit",
+    title: "AI-Powered Tax Filing for Everyone — Simple, Accurate, Affordable",
+    subtitle:
+      "File your taxes with a multilingual AI assistant designed for gig workers, families, seniors, immigrants, and low-income households.",
+    supportLine:
+      "Upload your W-2, 1099, or receipts — get instant calculations — file with confidence.",
+    uploadBtn: "Start Filing Now",
+    startBtn: "Upload Tax Documents",
     dragText: "Glissez-déposez vos documents fiscaux ici ou cliquez pour parcourir",
     supportedFiles: "Supporte PDF, JPG, PNG (Max 10MB)",
     features: ["Sécurité Bancaire", "Couverture Mondiale", "Support 24/7"]
   },
   ar: {
-    title: "تقديم الضرائب العالمي بالذكاء الاصطناعي مبسط",
-    subtitle: "أتمت عملية تقديم الضرائب الخاصة بك بتقنية الذكاء الاصطناعي المتقدمة. ارفع المستندات، احصل على حسابات فورية، وقدم بثقة.",
-    uploadBtn: "رفع المستندات الضريبية",
-    startBtn: "ابدأ مجاناً",
+    title: "AI-Powered Tax Filing for Everyone — Simple, Accurate, Affordable",
+    subtitle:
+      "File your taxes with a multilingual AI assistant designed for gig workers, families, seniors, immigrants, and low-income households.",
+    supportLine:
+      "Upload your W-2, 1099, or receipts — get instant calculations — file with confidence.",
+    uploadBtn: "Start Filing Now",
+    startBtn: "Upload Tax Documents",
     dragText: "اسحب وأفلت مستنداتك الضريبية هنا أو انقر للتصفح",
     supportedFiles: "يدعم PDF, JPG, PNG (حد أقصى 10 ميجابايت)",
     features: ["أمان مصرفي", "تغطية عالمية", "دعم 24/7"]
   },
   ru: {
-    title: "Глобальная Подача Налогов с ИИ Упрощена",
-    subtitle: "Автоматизируйте процесс подачи налогов с передовой технологией ИИ. Загружайте документы, получайте мгновенные расчеты и подавайте с уверенностью.",
-    uploadBtn: "Загрузить Налоговые Документы",
-    startBtn: "Начать Бесплатно",
+    title: "AI-Powered Tax Filing for Everyone — Simple, Accurate, Affordable",
+    subtitle:
+      "File your taxes with a multilingual AI assistant designed for gig workers, families, seniors, immigrants, and low-income households.",
+    supportLine:
+      "Upload your W-2, 1099, or receipts — get instant calculations — file with confidence.",
+    uploadBtn: "Start Filing Now",
+    startBtn: "Upload Tax Documents",
     dragText: "Перетащите налоговые документы сюда или нажмите для просмотра",
     supportedFiles: "Поддерживает PDF, JPG, PNG (Макс 10МБ)",
     features: ["Банковская Безопасность", "Глобальное Покрытие", "Поддержка 24/7"]
   },
   zh: {
-    title: "AI驱动的全球税务申报简化版",
-    subtitle: "使用先进的AI技术自动化您的税务申报流程。上传文档，获得即时计算，并自信地申报。",
-    uploadBtn: "上传税务文档",
-    startBtn: "免费开始",
+    title: "AI-Powered Tax Filing for Everyone — Simple, Accurate, Affordable",
+    subtitle:
+      "File your taxes with a multilingual AI assistant designed for gig workers, families, seniors, immigrants, and low-income households.",
+    supportLine:
+      "Upload your W-2, 1099, or receipts — get instant calculations — file with confidence.",
+    uploadBtn: "Start Filing Now",
+    startBtn: "Upload Tax Documents",
     dragText: "将税务文档拖放到此处或点击浏览",
     supportedFiles: "支持PDF、JPG、PNG（最大10MB）",
     features: ["银行级安全", "全球覆盖", "24/7支持"]
   },
   hi: {
-    title: "AI-संचालित वैश्विक कर फाइलिंग सरल बनाई गई",
-    subtitle: "उन्नत AI तकनीक के साथ अपनी कर फाइलिंग प्रक्रिया को स्वचालित करें। दस्तावेज़ अपलोड करें, तत्काल गणना प्राप्त करें, और आत्मविश्वास के साथ फाइल करें।",
-    uploadBtn: "अपने कर दस्तावेज़ अपलोड करें",
-    startBtn: "मुफ्त शुरू करें",
+    title: "AI-Powered Tax Filing for Everyone — Simple, Accurate, Affordable",
+    subtitle:
+      "File your taxes with a multilingual AI assistant designed for gig workers, families, seniors, immigrants, and low-income households.",
+    supportLine:
+      "Upload your W-2, 1099, or receipts — get instant calculations — file with confidence.",
+    uploadBtn: "Start Filing Now",
+    startBtn: "Upload Tax Documents",
     dragText: "अपने कर दस्तावेज़ों को यहाँ खींचें और छोड़ें या ब्राउज़ करने के लिए क्लिक करें",
     supportedFiles: "PDF, JPG, PNG समर्थित (अधिकतम 10MB)",
     features: ["बैंक-स्तरीय सुरक्षा", "वैश्विक कवरेज", "24/7 सहायता"]
@@ -115,9 +136,8 @@ export default function HeroSection({ currentLanguage }: HeroSectionProps) {
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
               {t.title}
             </h1>
-            <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-              {t.subtitle}
-            </p>
+            <p className="text-xl text-gray-600 leading-relaxed mb-4">{t.subtitle}</p>
+            <p className="text-lg text-gray-500 leading-relaxed mb-8">{t.supportLine}</p>
             
             <div className="flex flex-col sm:flex-row gap-4 mb-12">
               <Link href="/file-taxes">

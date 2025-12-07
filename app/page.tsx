@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import Header from '../components/Header';
 import HeroSection from '../components/HeroSection';
+import WhyDifferentSection from '../components/WhyDifferentSection';
 import FeaturesSection from '../components/FeaturesSection';
 import HowItWorksSection from '../components/HowItWorksSection';
 import PricingSection from '../components/PricingSection';
@@ -16,11 +17,12 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header 
-        currentLanguage={currentLanguage} 
-        setCurrentLanguage={setCurrentLanguage} 
+      <Header
+        currentLanguage={currentLanguage}
+        setCurrentLanguage={setCurrentLanguage}
       />
-      <HeroSection />
+      <HeroSection currentLanguage={currentLanguage} />
+      <WhyDifferentSection />
       <FeaturesSection />
       <HowItWorksSection />
       <PricingSection />
