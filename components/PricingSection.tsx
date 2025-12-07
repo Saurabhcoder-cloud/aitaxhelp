@@ -8,8 +8,8 @@ interface PricingSectionProps {
 
 const translations = {
   en: {
-    title: "Simple One-Time Pricing",
-    subtitle: "Pay only when you need our services - no subscriptions or hidden fees",
+    title: "Simple, Transparent Pricing — No Monthly Fees",
+    subtitle: "Pay only when you need our services — no subscriptions or hidden fees",
     getStarted: "Get Started",
     oneTimePayment: "One-Time Payment",
     perFiling: "Per Filing",
@@ -43,8 +43,8 @@ const translations = {
     ]
   },
   es: {
-    title: "Precios Simples de Pago Único",
-    subtitle: "Paga solo cuando necesites nuestros servicios - sin suscripciones o tarifas ocultas",
+    title: "Precios simples y transparentes — sin cuotas mensuales",
+    subtitle: "Paga solo cuando necesites nuestros servicios — sin suscripciones ni tarifas ocultas",
     getStarted: "Comenzar",
     oneTimePayment: "Pago Único",
     perFiling: "Por Declaración",
@@ -77,8 +77,8 @@ const translations = {
     ]
   },
   fr: {
-    title: "Tarification Simple à Paiement Unique",
-    subtitle: "Payez seulement quand vous avez besoin de nos services - pas d'abonnements ou de frais cachés",
+    title: "Tarification simple et transparente — sans frais mensuels",
+    subtitle: "Payez seulement lorsque vous avez besoin de nos services — pas d'abonnements ni de frais cachés",
     getStarted: "Commencer",
     oneTimePayment: "Paiement Unique",
     perFiling: "Par Déclaration",
@@ -111,8 +111,8 @@ const translations = {
     ]
   },
   ar: {
-    title: "تسعير بسيط بدفعة واحدة",
-    subtitle: "ادفع فقط عندما تحتاج خدماتنا - بدون اشتراكات أو رسوم مخفية",
+    title: "تسعير بسيط وشفاف — بدون رسوم شهرية",
+    subtitle: "ادفع فقط عندما تحتاج خدماتنا — بدون اشتراكات أو رسوم مخفية",
     getStarted: "ابدأ",
     oneTimePayment: "دفعة واحدة",
     perFiling: "لكل إقرار",
@@ -145,8 +145,8 @@ const translations = {
     ]
   },
   ru: {
-    title: "Простая Разовая Оплата",
-    subtitle: "Платите только когда нужны наши услуги - никаких подписок или скрытых платежей",
+    title: "Простые и прозрачные цены — без ежемесячных платежей",
+    subtitle: "Платите только когда нужны наши услуги — без подписок и скрытых платежей",
     getStarted: "Начать",
     oneTimePayment: "Разовый Платеж",
     perFiling: "За Подачу",
@@ -179,8 +179,8 @@ const translations = {
     ]
   },
   zh: {
-    title: "简单一次性付费",
-    subtitle: "只在需要我们服务时付费 - 无订阅或隐藏费用",
+    title: "简单透明的定价 — 无月费",
+    subtitle: "只在需要我们服务时付费 — 无订阅或隐藏费用",
     getStarted: "开始使用",
     oneTimePayment: "一次性付费",
     perFiling: "每次申报",
@@ -213,8 +213,8 @@ const translations = {
     ]
   },
   hi: {
-    title: "सरल एक-बार भुगतान",
-    subtitle: "केवल तभी भुगतान करें जब आपको हमारी सेवाओं की आवश्यकता हो - कोई सब्सक्रिप्शन या छुपी फीस नहीं",
+    title: "सरल, पारदर्शी मूल्य निर्धारण — कोई मासिक शुल्क नहीं",
+    subtitle: "केवल तभी भुगतान करें जब आपको हमारी सेवाओं की आवश्यकता हो — कोई सब्सक्रिप्शन या छुपी फीस नहीं",
     getStarted: "शुरू करें",
     oneTimePayment: "एक-बार भुगतान",
     perFiling: "प्रति फाइलिंग",
@@ -253,53 +253,50 @@ export default function PricingSection({ currentLanguage }: PricingSectionProps)
 
   const plans = [
     {
-      name: 'Registration Fee',
+      name: 'Registration Fee — $9.99 (lifetime access)',
       price: '$9.99',
-      period: 'One-Time Registration Fee',
-      description: 'This is a one-time registration fee that gives the client lifetime access to the website and its features. After paying this fee once, the client can use the website every year to prepare their tax return without any renewal or subscription charges.',
+      period: 'Registration Fee — $9.99 (lifetime access)',
+      description: 'Lifetime account access. Secure document storage. Basic tax guidance. Email support.',
       features: [
-        'Lifetime website access',
-        'No renewal charges',
-        'Use every tax season',
-        'Basic support included',
-        'Secure account setup'
+        'Lifetime account access',
+        'Secure document storage',
+        'Basic tax guidance',
+        'Email support'
       ],
       popular: false,
-      buttonText: 'Register Now',
+      buttonText: 'File Now',
       buttonLink: '/register'
     },
     {
-      name: 'Individual Tax Return',
+      name: 'Individual Tax Return — $19.99',
       price: '$19.99',
-      period: 'Per Filing',
-      description: 'Fee for preparing a tax return for a single individual (one client filing only for themselves). The client pays this fee only once per year, when they prepare their tax return. There are no monthly or annual subscription payments.',
+      period: 'Individual Tax Return — $19.99',
+      description: 'Federal & state filing. Maximum refund calculation. Audit assistance. Priority email support.',
       features: [
-        'Single individual filing',
-        'Federal tax return',
-        'State tax return',
-        'Tax law guidance',
-        'Filing address provided',
-        'One-time annual payment'
+        'Federal & state filing',
+        'Maximum refund calculation',
+        'Audit assistance',
+        'Priority email support'
       ],
       popular: true,
-      buttonText: 'File Individual Return',
+      buttonText: 'File Now',
       buttonLink: '/file-taxes'
     },
     {
-      name: 'Family Tax Return',
+      name: 'Family Tax Return — $24.99',
       price: '$24.99',
-      period: 'Per Filing',
-      description: 'Fee for preparing a tax return for a married couple (husband and wife filing together). This is referred to as a "family return." The client pays this fee once per year, when they prepare a joint tax return.',
+      period: 'Family Tax Return — $24.99',
+      description: 'Joint return preparation. Dependents included. Child Tax Credit support. Earned Income Credit support. Maximum refund guarantee. Priority support.',
       features: [
-        'Married couple filing',
-        'Joint tax return',
-        'Federal and state filing',
-        'Family tax guidance',
-        'Filing addresses provided',
-        'One-time annual payment'
+        'Joint return preparation',
+        'Dependents included',
+        'Child Tax Credit support',
+        'Earned Income Credit support',
+        'Maximum refund guarantee',
+        'Priority support'
       ],
       popular: false,
-      buttonText: 'File Family Return',
+      buttonText: 'File Now',
       buttonLink: '/file-taxes'
     }
   ];

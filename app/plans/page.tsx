@@ -10,55 +10,52 @@ export default function PlansPage() {
 
   const plans = [
     {
-      name: 'Registration Fee',
+      name: 'Registration Fee — $9.99 (lifetime access)',
       price: '$9.99',
-      period: 'One-Time Registration Fee',
-      description: 'This is a one-time registration fee that gives the client lifetime access to the website and its features. After paying this fee once, the client can use the website every year to prepare their tax return without any renewal or subscription charges.',
+      period: 'Registration Fee — $9.99 (lifetime access)',
+      description: 'Lifetime account access. Secure document storage. Basic tax guidance. Email support.',
       features: [
-        'Lifetime website access',
-        'No renewal charges',
-        'Use every tax season',
-        'Basic support included',
-        'Secure account setup'
+        'Lifetime account access',
+        'Secure document storage',
+        'Basic tax guidance',
+        'Email support'
       ],
       popular: false,
-      buttonText: 'Register Now',
+      buttonText: 'File Now',
       buttonLink: '/register',
       icon: 'ri-user-add-line'
     },
     {
-      name: 'Individual Tax Return',
+      name: 'Individual Tax Return — $19.99',
       price: '$19.99',
-      period: 'Per Filing',
-      description: 'Fee for preparing a tax return for a single individual (one client filing only for themselves). The client pays this fee only once per year, when they prepare their tax return. There are no monthly or annual subscription payments.',
+      period: 'Individual Tax Return — $19.99',
+      description: 'Federal & state filing. Maximum refund calculation. Audit assistance. Priority email support.',
       features: [
-        'Single individual filing',
-        'Federal tax return',
-        'State tax return',
-        'Tax law guidance',
-        'Filing address provided',
-        'One-time annual payment'
+        'Federal & state filing',
+        'Maximum refund calculation',
+        'Audit assistance',
+        'Priority email support'
       ],
       popular: true,
-      buttonText: 'File Individual Return',
+      buttonText: 'File Now',
       buttonLink: '/file-taxes',
       icon: 'ri-user-line'
     },
     {
-      name: 'Family Tax Return',
+      name: 'Family Tax Return — $24.99',
       price: '$24.99',
-      period: 'Per Filing',
-      description: 'Fee for preparing a tax return for a married couple (husband and wife filing together). This is referred to as a "family return." The client pays this fee once per year, when they prepare a joint tax return.',
+      period: 'Family Tax Return — $24.99',
+      description: 'Joint return preparation. Dependents included. Child Tax Credit support. Earned Income Credit support. Maximum refund guarantee. Priority support.',
       features: [
-        'Married couple filing',
-        'Joint tax return',
-        'Federal and state filing',
-        'Family tax guidance',
-        'Filing addresses provided',
-        'One-time annual payment'
+        'Joint return preparation',
+        'Dependents included',
+        'Child Tax Credit support',
+        'Earned Income Credit support',
+        'Maximum refund guarantee',
+        'Priority support'
       ],
       popular: false,
-      buttonText: 'File Family Return',
+      buttonText: 'File Now',
       buttonLink: '/file-taxes',
       icon: 'ri-team-line'
     }
@@ -76,8 +73,8 @@ export default function PlansPage() {
       <main className="pt-20 pb-16">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">Simple One-Time Pricing</h1>
-            <p className="text-xl text-gray-600 mb-8">Pay only when you need our services - no subscriptions or hidden fees</p>
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">Simple, Transparent Pricing — No Monthly Fees</h1>
+            <p className="text-xl text-gray-600 mb-8">Pay only when you need our services — no subscriptions or hidden fees</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
