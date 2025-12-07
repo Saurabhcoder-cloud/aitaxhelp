@@ -14,6 +14,7 @@ import PricingSection from '../components/PricingSection';
 import ContactSection from '../components/ContactSection';
 import Footer from '../components/Footer';
 import TaxNewsSection from '../components/TaxNewsSection';
+import FinalCTASection from '../components/FinalCTASection';
 
 export default function Home() {
   const [currentLanguage, setCurrentLanguage] = useState('en');
@@ -34,6 +35,7 @@ export default function Home() {
       <PricingSection />
       <TaxNewsSection />
       <ContactSection />
+      <FinalCTASection />
       <Footer />
     </div>
   );
