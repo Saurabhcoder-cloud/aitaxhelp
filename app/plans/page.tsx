@@ -172,20 +172,24 @@ export default function PlansPage() {
             <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">Frequently Asked Questions</h2>
             <div className="max-w-3xl mx-auto space-y-6">
               <div className="bg-white rounded-lg shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">How does the one-time pricing work?</h3>
-                <p className="text-gray-600">You pay a one-time $9.99 registration fee for lifetime access, then only pay when you file your tax return each year ($19.99 individual or $24.99 family).</p>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">What is the registration fee for?</h3>
+                <p className="text-gray-600">It provides lifetime access to your account, secure document storage, and basic AI tax guidance.</p>
+              </div>
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">When do I pay the filing fees?</h3>
+                <p className="text-gray-600">You only pay when you choose to file your completed tax return.</p>
               </div>
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Is my data secure?</h3>
-                <p className="text-gray-600">Absolutely. We use bank-level encryption and follow strict security protocols to protect your sensitive information.</p>
+                <p className="text-gray-600">Yes. All documents and information are fully encrypted and stored securely.</p>
               </div>
               <div className="bg-white rounded-lg shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">What's included in the registration fee?</h3>
-                <p className="text-gray-600">The registration fee gives you lifetime access to our platform, tax law guidance, and the ability to prepare your returns every year without additional subscription costs.</p>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Can I file taxes for multiple years?</h3>
+                <p className="text-gray-600">Yes. You can upload past documents and file previous years’ returns.</p>
               </div>
               <div className="bg-white rounded-lg shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Can I file for multiple years?</h3>
-                <p className="text-gray-600">Yes, you can file tax returns for current and prior years. Each filing requires the appropriate per-filing fee.</p>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Do you support all U.S. states?</h3>
+                <p className="text-gray-600">Yes — all states and local jurisdictions are supported.</p>
               </div>
             </div>
           </div>
