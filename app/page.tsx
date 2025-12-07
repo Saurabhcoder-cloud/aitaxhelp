@@ -6,6 +6,7 @@ import Header from '../components/Header';
 import HeroSection from '../components/HeroSection';
 import WhyDifferentSection from '../components/WhyDifferentSection';
 import SupportedTaxFormsSection from '../components/SupportedTaxFormsSection';
+import SecurityComplianceSection from '../components/SecurityComplianceSection';
 import FeaturesSection from '../components/FeaturesSection';
 import HowItWorksSection from '../components/HowItWorksSection';
 import PricingSection from '../components/PricingSection';
@@ -25,6 +26,7 @@ export default function Home() {
       <HeroSection currentLanguage={currentLanguage} />
       <WhyDifferentSection />
       <SupportedTaxFormsSection />
+      <SecurityComplianceSection />
       <FeaturesSection />
       <HowItWorksSection />
       <PricingSection />
