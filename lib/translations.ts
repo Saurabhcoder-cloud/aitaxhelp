@@ -144,27 +144,27 @@ export const translations = {
       }
     },
     features: {
-      title: 'Key Features',
+      title: 'Advanced AI Features Made for Fast and Accurate Filing',
       subtitle: 'Advanced AI technology meets tax expertise',
       ocr: {
-        title: 'OCR & Document Classifier',
-        desc: 'Automatically reads and categorizes your tax documents with 99% accuracy'
+        title: 'OCR & Smart Document Classifier',
+        desc: 'Extracts and classifies information from tax documents with 99.9% accuracy'
       },
       qa: {
         title: 'Multilingual Adaptive Q&A',
-        desc: 'Smart questions that adapt to your situation in your preferred language'
+        desc: 'AI adapts to your situation and asks only the relevant questions in your preferred language'
       },
       engine: {
-        title: 'Tax & Benefits Engine',
-        desc: 'Comprehensive tax calculations and benefit optimization for all countries'
+        title: 'Tax Law Guidance',
+        desc: 'Real-time explanations of deductions, credits, and IRS/state rules updated daily'
       },
       builder: {
         title: 'Draft Return Builder',
-        desc: 'Professional tax return generation with all required forms and schedules'
+        desc: 'Instantly generates a complete draft of your tax return based on your uploaded documents'
       },
       compliance: {
-        title: 'Compliance & Privacy',
-        desc: 'Bank-level security with full compliance to international tax regulations'
+        title: 'Compliance & Security',
+        desc: 'Bank-level encryption, secure storage, and IRS-aligned privacy requirements'
       }
     },
     enhancements: {
