@@ -136,7 +136,7 @@ export default function TaxNewsSection() {
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Daily U.S. Tax Law Updates</h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Stay informed with the latest changes and updates in U.S. tax legislation
+            Stay informed with real-time updates on IRS rules, federal changes, and state-specific tax adjustments.
           </p>
         </div>
 
