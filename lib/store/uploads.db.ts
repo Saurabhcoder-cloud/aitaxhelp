@@ -5,6 +5,10 @@ export const dbUploadStore = {
     const prisma = await getPrisma();
     return prisma.upload.create({ data });
   },
+  async setStorageKey(id: string, storageKey: string) {
+    const prisma = await getPrisma();
+    return prisma.upload.update({ where: { id }, data: { storageKey } });
+  },
   async getUpload(id: string) {
     const prisma = await getPrisma();
     return prisma.upload.findUnique({ where: { id }, include: { consent: true } });
@@ -16,6 +20,10 @@ export const dbUploadStore = {
   async updateUploadStatus(id: string, status: string) {
     const prisma = await getPrisma();
     return prisma.upload.update({ where: { id }, data: { status } });
+  },
+  async updateUploadMeta(id: string, data: Partial<{ status: string; storageKey: string; updatedAt: Date }>) {
+    const prisma = await getPrisma();
+    return prisma.upload.update({ where: { id }, data });
   },
   async addAudit(uploadId: string, type: string, metaJson?: Record<string, any>) {
     const prisma = await getPrisma();

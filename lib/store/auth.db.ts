@@ -17,9 +17,21 @@ export const dbAuthStore = {
     const prisma = await getPrisma();
     return prisma.otpToken.create({ data: { email, tokenHash, expiresAt } });
   },
+  async upsertOtp(email: string, tokenHash: string, expiresAt: Date) {
+    const prisma = await getPrisma();
+    return prisma.otpToken.upsert({
+      where: { email },
+      update: { tokenHash, expiresAt, attempts: 0, createdAt: new Date() },
+      create: { email, tokenHash, expiresAt },
+    });
+  },
   async findOtp(email: string) {
     const prisma = await getPrisma();
     return prisma.otpToken.findFirst({ where: { email }, orderBy: { createdAt: "desc" } });
+  },
+  async findRecentOtps(email: string, since: Date) {
+    const prisma = await getPrisma();
+    return prisma.otpToken.findMany({ where: { email, createdAt: { gte: since } } });
   },
   async getUserById(id: string) {
     const prisma = await getPrisma();
@@ -40,6 +52,10 @@ export const dbAuthStore = {
   async findSession(tokenHash: string) {
     const prisma = await getPrisma();
     return prisma.session.findFirst({ where: { tokenHash } });
+  },
+  async findSessionById(id: string) {
+    const prisma = await getPrisma();
+    return prisma.session.findUnique({ where: { id } });
   },
   async getSession(id: string) {
     const prisma = await getPrisma();

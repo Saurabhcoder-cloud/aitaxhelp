@@ -36,19 +36,50 @@ export default function UploadPage() {
   const form = useForm<FormValues>({ resolver: zodResolver(schema) });
 
   const onSubmit = async (values: FormValues) => {
-    const formData = new FormData();
-    formData.append("file", values.file);
-    if (state.language) formData.append("language", state.language);
-
-    const res = await fetch("/api/upload", { method: "POST", body: formData });
-    const data = await res.json();
-    if (!res.ok) {
-      toast({ title: t("errors.title"), description: data.message || t("errors.generic") });
-      return;
+    const file = values.file as File;
+    try {
+      const initRes = await fetch("/api/upload/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name, mime: file.type, size: file.size }),
+      });
+      if (initRes.status === 400) {
+        // fallback to stub
+        const formData = new FormData();
+        formData.append("file", file);
+        if (state.language) formData.append("language", state.language);
+        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || t("errors.generic"));
+        updateState({ uploadId: data.upload_id, fileName: file.name, uploadStatus: "uploaded" });
+        toast({ title: t("success.title"), description: t("success.detail") });
+        router.push("/processing");
+        return;
+      }
+      if (!initRes.ok) {
+        const err = await initRes.json().catch(() => ({}));
+        throw new Error(err.error || t("errors.generic"));
+      }
+      const initData = await initRes.json();
+      await fetch(initData.presignedUrl, {
+        method: "PUT",
+        headers: initData.requiredHeaders,
+        body: file,
+      });
+      const completeRes = await fetch("/api/upload/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uploadId: initData.uploadId }),
+      });
+      if (!completeRes.ok) {
+        throw new Error(t("errors.generic"));
+      }
+      updateState({ uploadId: initData.uploadId, fileName: file.name, uploadStatus: "uploaded" });
+      toast({ title: t("success.title"), description: t("success.detail") });
+      router.push(`/processing?upload_id=${initData.uploadId}`);
+    } catch (error: any) {
+      toast({ title: t("errors.title"), description: error?.message || t("errors.generic") });
     }
-    updateState({ uploadId: data.upload_id, fileName: values.file.name, uploadStatus: "uploaded" });
-    toast({ title: t("success.title"), description: t("success.detail") });
-    router.push("/processing");
   };
 
   return (
