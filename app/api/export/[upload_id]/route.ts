@@ -8,9 +8,9 @@ export async function GET(
   { params, url }: { params: { upload_id: string }; url: string }
 ) {
   const sessionId = cookies().get("sessionId")?.value;
-  const session = authStore.getSession(sessionId);
+  const session = await Promise.resolve(authStore.getSession(sessionId));
   if (!session && !isStubMode()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const entitlement = session ? entitlementStore.getEntitlement(session.userId) : undefined;
+  const entitlement = session ? await Promise.resolve(entitlementStore.getEntitlement(session.userId)) : undefined;
   if (!entitlement && !isStubMode()) return NextResponse.json({ error: "payment_required" }, { status: 402 });
 
   const { upload_id } = params;
@@ -31,14 +31,14 @@ export async function POST(
   { params }: { params: { upload_id: string } }
 ) {
   const sessionId = cookies().get("sessionId")?.value;
-  const session = authStore.getSession(sessionId);
+  const session = await Promise.resolve(authStore.getSession(sessionId));
   if (!session && !isStubMode()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const entitlement = session ? entitlementStore.getEntitlement(session.userId) : undefined;
+  const entitlement = session ? await Promise.resolve(entitlementStore.getEntitlement(session.userId)) : undefined;
   if (!entitlement && !isStubMode()) return NextResponse.json({ error: "payment_required" }, { status: 402 });
 
   const { upload_id } = params;
   const timestamp = new Date().toISOString();
-  let existing = uploadStore.getUpload(upload_id);
+  let existing = await Promise.resolve(uploadStore.getUpload(upload_id));
 
   if (!existing && isStubMode()) {
     existing = uploadStore.createUpload({
@@ -47,6 +47,7 @@ export async function POST(
       size: 0,
       type: "application/pdf",
       uploadedAt: timestamp,
+      language: "en",
     });
   }
 
@@ -57,10 +58,12 @@ export async function POST(
   const body = await req.json().catch(() => null) as { locale?: string } | null;
   const locale = body?.locale ?? "en";
 
-  const updated = uploadStore.updateUploadStatus(upload_id, {
-    status: "consented",
-    consent: { timestamp, locale },
-  });
+  const updated = await Promise.resolve(
+    uploadStore.updateUploadStatus(upload_id, {
+      status: "consented",
+      consent: { timestamp, locale },
+    }),
+  );
 
   return NextResponse.json({ ok: true, consent: updated?.consent, audit: updated?.audit });
 }

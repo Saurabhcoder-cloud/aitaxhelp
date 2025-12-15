@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { authStore, entitlementStore } from "@/lib/store";
 import { isStubMode } from "@/lib/env";
 
-export default function AccountPage() {
+export default async function AccountPage() {
   const sessionId = cookies().get("sessionId")?.value;
-  const session = authStore.getSession(sessionId);
+  const session = await Promise.resolve(authStore.getSession(sessionId));
   if (!session) redirect("/login?redirect=/account");
-  const user = authStore.getUserById(session.userId);
-  const entitlement = entitlementStore.getEntitlement(session.userId);
+  const user = await Promise.resolve(authStore.getUserById(session.userId));
+  const entitlement = await Promise.resolve(entitlementStore.getEntitlement(session.userId));
 
   async function logout() {
     "use server";

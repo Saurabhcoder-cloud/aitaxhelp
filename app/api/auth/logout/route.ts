@@ -4,7 +4,9 @@ import { authStore } from "@/lib/store";
 
 export async function POST() {
   const sessionId = cookies().get("sessionId")?.value;
-  authStore.deleteSession(sessionId);
+  if (sessionId) {
+    await Promise.resolve(authStore.deleteSession(sessionId));
+  }
   cookies().delete("sessionId");
   return NextResponse.json({ ok: true });
 }

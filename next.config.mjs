@@ -27,6 +27,12 @@ const nextConfig = {
       "@radix-ui/react-toast": ensureStub("@radix-ui/react-toast"),
       clsx: ensureStub("clsx"),
       "tailwind-merge": ensureStub("tailwind-merge"),
+      "@aws-sdk/client-s3": ensureStub("@aws-sdk/client-s3"),
+      "@aws-sdk/s3-request-presigner": ensureStub("@aws-sdk/s3-request-presigner"),
+      "@aws-sdk/client-ses": ensureStub("@aws-sdk/client-ses"),
+      "@aws-sdk/client-textract": ensureStub("@aws-sdk/client-textract"),
+      stripe: ensureStub("stripe"),
+      "@prisma/client": ensureStub("@prisma/client"),
     };
 
     config.resolve.alias = config.resolve.alias || {};

@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "ci": "npm run lint && npm run typecheck && npm run build"
+    "ci": "npm run lint && npm run typecheck && npm run build",
+    "db:migrate": "node scripts/db-migrate.js",
+    "worker": "node scripts/worker.js"
   },
   "dependencies": {
     "next": "14.2.16",

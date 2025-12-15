@@ -117,6 +117,66 @@ declare module "tailwind-merge" {
   export default twMerge;
 }
 
+declare module "@prisma/client" {
+  export class PrismaClient {
+    constructor(...args: any[]);
+    user: any;
+    session: any;
+    otpToken: any;
+    entitlement: any;
+    upload: any;
+    auditEvent: any;
+    consent: any;
+    job: any;
+    $disconnect(): Promise<void>;
+  }
+}
+
+declare module "@aws-sdk/client-s3" {
+  export class S3Client {
+    constructor(config?: any);
+    send(...args: any[]): Promise<any>;
+  }
+  export class PutObjectCommand {
+    constructor(input: any);
+  }
+}
+
+declare module "@aws-sdk/s3-request-presigner" {
+  export const getSignedUrl: (...args: any[]) => Promise<string>;
+}
+
+declare module "@aws-sdk/client-ses" {
+  export class SESClient {
+    constructor(config?: any);
+    send(...args: any[]): Promise<any>;
+  }
+  export class SendEmailCommand {
+    constructor(input: any);
+  }
+}
+
+declare module "@aws-sdk/client-textract" {
+  export class TextractClient {
+    constructor(config?: any);
+    send(...args: any[]): Promise<any>;
+  }
+  export class StartDocumentAnalysisCommand {
+    constructor(input: any);
+  }
+  export class GetDocumentAnalysisCommand {
+    constructor(input: any);
+  }
+}
+
+declare module "stripe" {
+  export interface StripeConstructor {
+    new (key: string, opts?: any): any;
+  }
+  const Stripe: StripeConstructor;
+  export default Stripe;
+}
+
 // Allow importing asset and style modules in tests/builds without full type packages.
 declare module "*.css" {
   const classes: { [key: string]: string };

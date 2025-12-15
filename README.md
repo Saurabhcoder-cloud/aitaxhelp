@@ -34,8 +34,17 @@ npm run ci # runs lint, typecheck, then build
 
 - Copy `.env.example` to `.env.local` and fill in the values you need.
 - `STUB_MODE=true` (default) keeps all integrations in local/demo JSON stores so the app works offline or without paid providers. Auth + checkout can be simulated via `/login` and `/checkout` → `Simulate payment`.
-- `STUB_MODE=false` enables production adapters for auth, payments, storage, and news; provide Stripe keys, email credentials, and database/storage URLs.
+- `STUB_MODE=false` enables production adapters for auth, payments, storage, and news; provide Stripe keys, email credentials, Postgres, and database/storage URLs. Real mode expects Prisma migrations (see `prisma/schema.prisma`), S3/SES/Textract credentials, and Stripe price IDs.
 - If `npm install` fails due to registry limitations, set a registry mirror (`npm config set registry https://registry.npmjs.org`) or use an offline cache.
+
+### Demo mode (offline / stub)
+- `npm run ci` will lint/typecheck/build using stub aliases if dependencies are absent.
+- OTP codes display in the UI/API responses for faster testing.
+
+### Production mode (real integrations)
+- Install Prisma and generate a client, then run `npm run db:migrate` against your Postgres `DATABASE_URL`.
+- Configure Stripe prices (`STRIPE_PRICE_*`), webhook secret, AWS region/keys, SES sender, and S3 bucket/KMS key if used.
+- Run `npm run worker` (or deploy `scripts/worker.js` as a service) to process Textract and other background jobs.
 
 ## Tech stack
 - Next.js 14 (App Router) with TypeScript
@@ -81,7 +90,8 @@ No automated browser tests are included yet. Add Playwright or React Testing Lib
 
 ## Go-live checklist
 - Configure DNS to point to your deployment host.
-- Set environment variables: `STUB_MODE`, `DATABASE_URL`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, email provider creds, and storage credentials.
+- Set environment variables: `STUB_MODE`, `DATABASE_URL`, `SESSION_SECRET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET`, `SES_FROM_EMAIL`, `STRIPE_SECRET_KEY`, `STRIPE_PRICE_*`, and `STRIPE_WEBHOOK_SECRET`.
 - Create Stripe webhook pointing to `/api/webhooks/stripe` with the signing secret.
-- Ensure storage bucket/policy allows private uploads and signed download URLs only.
+- Verify SES sender/receiving domains (sandbox vs production) and S3 bucket/KMS policy for private uploads + signed URLs only.
 - Run database migrations/seeds for auth/uploads/entitlements when swapping out the JSON stores.
+- Deploy `scripts/worker.js` (with `STUB_MODE=false`) on a background worker (ECS/Fargate/Render) for Textract polling and job processing.
