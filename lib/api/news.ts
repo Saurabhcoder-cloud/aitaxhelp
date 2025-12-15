@@ -31,3 +31,45 @@ export const mockedNews: NewsItem[] = [
     summary: "Security bulletin on avoiding scams targeting e-file credentials and refunds.",
   },
 ];
+
+let cached: { at: number; items: NewsItem[] } | null = null;
+
+export async function fetchNews(): Promise<NewsItem[]> {
+  if (cached && Date.now() - cached.at < 1000 * 60 * 60 * 6) {
+    return cached.items;
+  }
+  const { isStubMode } = await import("@/lib/env");
+  if (isStubMode()) return mockedNews;
+
+  try {
+    const parser = await import("fast-xml-parser");
+    const feeds = [
+      "https://www.irs.gov/rss/irs-news",
+      "https://www.taxadmin.org/feed", // multi-state tax admin association
+    ];
+    const fetches = await Promise.all(
+      feeds.map(async (url) => {
+        const res = await fetch(url, { cache: "no-store" });
+        const text = await res.text();
+        const parsed = parser.XMLParser ? new parser.XMLParser().parse(text) : (parser as any).parse(text);
+        const items =
+          parsed?.rss?.channel?.item || parsed?.feed?.entry || parsed?.rss?.channel?.items || parsed?.channel?.item || [];
+        return Array.isArray(items) ? items : [items];
+      }),
+    );
+    const merged: NewsItem[] = fetches
+      .flat()
+      .filter(Boolean)
+      .map((item: any) => ({
+        date: item.pubDate || item.updated || item.date || new Date().toISOString(),
+        title: item.title?.["#text"] || item.title || "Tax update",
+        summary: item.description || item.summary || item["content:encoded"] || "",
+      }))
+      .slice(0, 8);
+    cached = { at: Date.now(), items: merged.length ? merged : mockedNews };
+    return cached.items;
+  } catch (err) {
+    console.error("news fetch failed", err);
+    return mockedNews;
+  }
+}

@@ -438,6 +438,20 @@
         "title": "Consent failed",
         "detail": "Please try saving consent again."
       }
+    },
+    "auth": {
+      "loginTitle": "Sign in to continue",
+      "loginDescription": "Use your email to receive a one-time code.",
+      "emailLabel": "Email",
+      "requestCode": "Send code",
+      "codeLabel": "Verification code",
+      "verify": "Verify and continue",
+      "stubHint": "Demo mode shares the code directly on screen.",
+      "invalid": "Invalid or expired code. Please retry.",
+      "logout": "Log out",
+      "demoBanner": "Demo mode active — authentication and payments are simulated.",
+      "noAccount": "Need an account? Enter your email to start.",
+      "otpSent": "Verification code sent"
     }
   }
 }

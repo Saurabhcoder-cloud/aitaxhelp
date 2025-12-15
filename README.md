@@ -30,6 +30,13 @@ npm run build
 npm run ci # runs lint, typecheck, then build
 ```
 
+### Modes and environment
+
+- Copy `.env.example` to `.env.local` and fill in the values you need.
+- `STUB_MODE=true` (default) keeps all integrations in local/demo JSON stores so the app works offline or without paid providers.
+- `STUB_MODE=false` enables the production adapters for auth, payments, storage, and news; provide Stripe keys, email credentials, and database/storage URLs.
+- If `npm install` fails due to registry limitations, set a registry mirror (`npm config set registry https://registry.npmjs.org`) or use an offline cache.
+
 ## Tech stack
 - Next.js 14 (App Router) with TypeScript
 - TailwindCSS + shadcn-inspired UI components

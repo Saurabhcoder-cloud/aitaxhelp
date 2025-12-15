@@ -1,10 +1,20 @@
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTranslations } from "next-intl";
 
 export function NewsSection() {
   const t = useTranslations("news");
-  const items = (t.raw("items") as { date: string; title: string; summary: string }[]) || [];
+  const [items, setItems] = useState<( { date: string; title: string; summary: string } )[]>(
+    (t.raw("items") as any) || [],
+  );
+
+  useEffect(() => {
+    fetch("/api/news")
+      .then((res) => res.json())
+      .then((data) => setItems(data.items))
+      .catch(() => {});
+  }, []);
   return (
     <section id="news" className="border-b border-border py-16">
       <div className="container space-y-6">
