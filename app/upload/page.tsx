@@ -23,7 +23,7 @@ export default function UploadPage() {
   const schema = z.object({
     file: z
       .any()
-      .refine((file) => file instanceof File, t("errors.required"))
+      .refine((file: File) => file instanceof File, t("errors.required"))
       .refine(
         (file: File) => ["application/pdf", "image/png", "image/jpeg"].includes(file.type),
         t("errors.type")

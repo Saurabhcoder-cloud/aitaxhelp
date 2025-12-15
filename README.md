@@ -11,6 +11,25 @@ npm run dev
 
 If you encounter a registry access error (e.g., 403), try setting an alternate npm registry (`npm config set registry https://registry.npmjs.org`) or using an offline cache/mirror. The codebase relies only on the dependencies in `package.json`, so installing in an environment with registry access will unblock `npm install`.
 
+### Linting, typechecking, and builds
+
+The repo includes a non-interactive ESLint config (`.eslintrc.json`). If `npm run lint` ever prompts for setup, ensure that file exists locally or run `npx next lint --no-lint-config --fix` once to regenerate it.
+
+TypeScript typecheck uses lightweight shims in `types/shims.d.ts` for environments where dependencies are not installed (e.g., offline/CI mirrors). If you install dependencies normally, those shims are ignored because upstream type packages are present. Add module declarations there when introducing new packages without bundled types.
+
+The Next.js build is configured to fall back to simple runtime stubs in `stubs/` (via `next.config.mjs`) when packages like `next-intl`, `react-hook-form`, or Radix UI components are unavailable. This keeps `npm run build` deterministic even in offline/registry-restricted environments while still using the real implementations when installed.
+
+Primary commands:
+
+```bash
+npm install
+npm run dev
+npm run lint
+npm run typecheck
+npm run build
+npm run ci # runs lint, typecheck, then build
+```
+
 ## Tech stack
 - Next.js 14 (App Router) with TypeScript
 - TailwindCSS + shadcn-inspired UI components
@@ -24,6 +43,7 @@ If you encounter a registry access error (e.g., 403), try setting an alternate n
 - `components/ui/` – shadcn-style primitives (Button, Card, Accordion, Tabs, Dialog, Toast, etc.)
 - `lib/messages/` – i18n message catalogs
 - `lib/store/` – file-backed upload metadata store for API stubs
+- `types/` – minimal type shims used when full type packages are unavailable
 
 ## Implemented flow
 1. `/start` – language selection ready for expansion to additional locales

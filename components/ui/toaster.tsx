@@ -19,7 +19,7 @@ function ToastViewport() {
             "relative overflow-hidden rounded-xl border border-border bg-background p-4 shadow-lg data-[state=open]:animate-toast-in",
             toast.className
           )}
-          onOpenChange={(open) => {
+          onOpenChange={(open: boolean) => {
             if (!open) dismiss(toast.id);
           }}
         >

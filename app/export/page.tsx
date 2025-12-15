@@ -85,7 +85,10 @@ export default function ExportPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <label className="flex items-start gap-3 text-sm text-muted-foreground">
-            <Checkbox checked={consent} onCheckedChange={(val) => setConsent(Boolean(val))} />
+            <Checkbox
+              checked={consent}
+              onCheckedChange={(val: boolean | "indeterminate") => setConsent(Boolean(val))}
+            />
             <span>{t("consent.text")}</span>
           </label>
           <div className="grid gap-3 sm:grid-cols-3">
