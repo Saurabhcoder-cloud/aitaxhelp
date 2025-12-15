@@ -1,0 +1,188 @@
+{
+  "meta": {
+    "title": "TaxHelp AI",
+    "description": "AI-Powered Tax Filing for Everyone — simple, accurate, affordable."
+  },
+  "nav": {
+    "hero": "Hero",
+    "why": "Why Different",
+    "forms": "Supported Forms",
+    "features": "Key Features",
+    "how": "How It Works",
+    "pricing": "Pricing",
+    "security": "Security",
+    "serve": "Who We Serve",
+    "news": "Daily Tax News",
+    "faq": "FAQ",
+    "cta": "Start Filing Now"
+  },
+  "languages": [
+    "English",
+    "Spanish",
+    "French",
+    "German",
+    "Chinese",
+    "Arabic",
+    "Hindi",
+    "Portuguese",
+    "Russian",
+    "Japanese"
+  ],
+  "hero": {
+    "title": "AI-Powered Tax Filing for Everyone — Simple, Accurate, Affordable",
+    "subtitle": "File your taxes with a multilingual AI assistant designed for gig workers, families, seniors, immigrants, and low-income households.",
+    "ctaPrimary": "Start Filing Now",
+    "ctaSecondary": "Upload Tax Documents",
+    "detail": "Upload your W-2, 1099, or receipts — get instant calculations — file with confidence."
+  },
+  "why": {
+    "title": "Why TaxHelp AI Is Different",
+    "subtitle": "Most tax platforms are built for accountants or high-income users.\nWe built TaxHelp AI for real people.",
+    "items": [
+      {
+        "title": "Built for Gig Workers",
+        "body": "DoorDash, UberEats, Lyft, Instacart, Uber, Amazon Flex — automatic mileage, vehicle expenses, tips, and gig-income deductions."
+      },
+      {
+        "title": "Built for Immigrants",
+        "body": "Support in 10 languages. Step-by-step assistance with simple explanations — no accounting knowledge required."
+      },
+      {
+        "title": "Built for Families",
+        "body": "Automatic Child Tax Credit, Earned Income Credit, dependents, and joint filings."
+      },
+      {
+        "title": "Built for Seniors",
+        "body": "Clear and simple help with Social Security (SSA-1099), retirement income, and medical deductions."
+      },
+      {
+        "title": "Built for Low-Income Households",
+        "body": "Affordable pricing and free filing for selected groups when grant funding becomes available."
+      }
+    ]
+  },
+  "forms": {
+    "title": "Supported Tax Forms",
+    "intro": "TaxHelp AI supports all major U.S. federal and state forms, including:",
+    "groups": [
+      {
+        "title": "Income Forms",
+        "items": ["W-2", "1099-NEC", "1099-MISC", "1099-K", "1099-INT / 1099-DIV", "SSA-1099", "1099-R"]
+      },
+      {
+        "title": "Health & Benefits",
+        "items": ["1095-A (Marketplace Health Insurance)", "1095-B / 1095-C"]
+      },
+      {
+        "title": "Gig & Freelance",
+        "items": ["Schedule C", "Vehicle mileage", "Business expenses", "Depreciation & supplies"]
+      },
+      {
+        "title": "Family & Credits",
+        "items": ["Child Tax Credit", "Earned Income Tax Credit", "Dependent care credits"]
+      },
+      {
+        "title": "State Filing",
+        "items": ["All U.S. states and local jurisdictions supported."]
+      }
+    ]
+  },
+  "features": {
+    "title": "Advanced AI Features Made for Fast and Accurate Filing",
+    "items": [
+      {"title": "OCR & Smart Document Classifier", "body": "Extracts and classifies information from tax documents with 99.9% accuracy."},
+      {"title": "Multilingual Adaptive Q&A", "body": "Our AI adapts to your situation and asks only the relevant questions — in your preferred language."},
+      {"title": "Tax Law Guidance", "body": "Real-time explanations of deductions, credits, and IRS/state rules updated daily."},
+      {"title": "Draft Return Builder", "body": "Instantly generates a complete draft of your tax return based on your uploaded documents."},
+      {"title": "Compliance & Security", "body": "Bank-level encryption, secure storage, and IRS-aligned privacy requirements."},
+      {"title": "State & Federal Filing Addresses", "body": "Automatically provides correct IRS and state mailing addresses for your location."}
+    ]
+  },
+  "how": {
+    "title": "How It Works — File Your Taxes in 3 Simple Steps",
+    "steps": [
+      {"title": "Upload Documents", "body": "Upload your W-2, 1099s, receipts, or statements using our encrypted platform."},
+      {"title": "AI Processing", "body": "Our AI reads your documents, validates information, applies deductions, and calculates your tax return automatically."},
+      {"title": "Review & File", "body": "Preview your completed tax return, make adjustments if needed, and file with federal and state authorities."}
+    ],
+    "cta": "Start Filing Now"
+  },
+  "pricing": {
+    "title": "Simple, Transparent Pricing — No Monthly Fees",
+    "plans": [
+      {
+        "name": "Registration Fee — $9.99 (lifetime access)",
+        "badge": "",
+        "features": ["Lifetime account access", "Secure document storage", "Basic tax guidance", "Email support"],
+        "cta": "File Now"
+      },
+      {
+        "name": "Individual Tax Return — $19.99",
+        "badge": "Most Popular",
+        "features": ["Federal & state filing", "Maximum refund calculation", "Audit assistance", "Priority email support"],
+        "cta": "File Now"
+      },
+      {
+        "name": "Family Tax Return — $24.99",
+        "badge": "Best Value for Couples",
+        "features": ["Joint return preparation", "Dependents included", "Child Tax Credit support", "Earned Income Credit support", "Maximum refund guarantee", "Priority support"],
+        "cta": "File Now"
+      }
+    ]
+  },
+  "security": {
+    "title": "Security & IRS Compliance",
+    "intro": "Your privacy and security are our top priority.",
+    "items": [
+      {"title": "Bank-Level Encryption", "body": "All tax documents are encrypted during upload, processing, and storage."},
+      {"title": "Secure Document Storage", "body": "Your information is never shared or sold. Documents can be deleted anytime."},
+      {"title": "IRS Compliance", "body": "TaxHelp AI follows IRS Publication 1345 and IRS data-protection standards.\nWe are preparing for IRS e-File Provider certification in 2026."},
+      {"title": "Data Confidentiality", "body": "We never use your documents to train AI models."}
+    ]
+  },
+  "serve": {
+    "title": "Who Can Use TaxHelp AI?",
+    "groups": [
+      {
+        "title": "Gig Workers & Freelancers",
+        "items": ["DoorDash, UberEats, Instacart, Lyft, Uber, TaskRabbit, Amazon Flex", "Automatic mileage tracking", "Business expense optimization", "Schedule C supported"]
+      },
+      {
+        "title": "Immigrants & Non-Native English Speakers",
+        "items": ["10 languages supported", "Simple explanations", "Step-by-step assistance"]
+      },
+      {
+        "title": "Families",
+        "items": ["Dependents and children", "Child Tax Credit", "Joint filing for married couples"]
+      },
+      {
+        "title": "Seniors & Retirees",
+        "items": ["SSA-1099", "Pension income", "Medical deductions", "Clear, simple instructions"]
+      }
+    ]
+  },
+  "news": {
+    "title": "Daily U.S. Tax Law Updates",
+    "intro": "Stay informed with real-time updates on IRS rules, federal changes, and state-specific tax adjustments.",
+    "badge": "Updated daily"
+  },
+  "faq": {
+    "title": "FAQ",
+    "items": [
+      {"question": "What is the registration fee for?", "answer": "It provides lifetime access to your account, secure document storage, and basic AI tax guidance."},
+      {"question": "When do I pay the filing fees?", "answer": "You only pay when you choose to file your completed tax return."},
+      {"question": "Is my data secure?", "answer": "Yes. All documents and information are fully encrypted and stored securely."},
+      {"question": "Can I file taxes for multiple years?", "answer": "Yes. You can upload past documents and file previous years’ returns."},
+      {"question": "Do you support all U.S. states?", "answer": "Yes — all states and local jurisdictions are supported."}
+    ]
+  },
+  "cta": {
+    "title": "Start Filing Your Taxes Today",
+    "subtitle": "Affordable, multilingual, AI-powered tax preparation for everyone.",
+    "button": "Start Now"
+  },
+  "workflow": {
+    "dataHandling": "Your documents are encrypted, can be deleted anytime, and are never used for model training.",
+    "consent": "I consent to data handling and agree to the retention policy."
+  }
+}
