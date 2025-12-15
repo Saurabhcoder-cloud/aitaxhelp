@@ -1,9 +1,11 @@
 import fs from "fs";
 import path from "path";
 
+const isStubMode = process.env.STUB_MODE !== "false";
 const ensureStub = (pkg) => {
+  if (!isStubMode) return null;
   const exists = fs.existsSync(path.join(process.cwd(), "node_modules", pkg));
-  return exists ? null : path.join(process.cwd(), "stubs", `${pkg.replace(/[/\\]/g, "-")}.ts`);
+  return exists ? null : path.join(process.cwd(), "stubs", `${pkg.replace(/[\/\\]/g, "-")}.ts`);
 };
 
 /** @type {import('next').NextConfig} */
