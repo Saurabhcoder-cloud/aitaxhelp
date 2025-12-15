@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "TaxHelp AI",
-    "description": "AI-Powered Tax Filing for Everyone — simple, accurate, affordable."
+    "description": "AI-Powered Tax Filing for Everyone \u2014 simple, accurate, affordable."
   },
   "nav": {
     "hero": "Hero",
@@ -29,11 +29,11 @@
     "Japanese"
   ],
   "hero": {
-    "title": "AI-Powered Tax Filing for Everyone — Simple, Accurate, Affordable",
+    "title": "AI-Powered Tax Filing for Everyone \u2014 Simple, Accurate, Affordable",
     "subtitle": "File your taxes with a multilingual AI assistant designed for gig workers, families, seniors, immigrants, and low-income households.",
     "ctaPrimary": "Start Filing Now",
     "ctaSecondary": "Upload Tax Documents",
-    "detail": "Upload your W-2, 1099, or receipts — get instant calculations — file with confidence.",
+    "detail": "Upload your W-2, 1099, or receipts \u2014 get instant calculations \u2014 file with confidence.",
     "workflowTitle": "Workflow",
     "workflowSteps": [
       "Language detect/selection",
@@ -61,11 +61,11 @@
     "items": [
       {
         "title": "Built for Gig Workers",
-        "body": "DoorDash, UberEats, Lyft, Instacart, Uber, Amazon Flex — automatic mileage, vehicle expenses, tips, and gig-income deductions."
+        "body": "DoorDash, UberEats, Lyft, Instacart, Uber, Amazon Flex \u2014 automatic mileage, vehicle expenses, tips, and gig-income deductions."
       },
       {
         "title": "Built for Immigrants",
-        "body": "Support in 10 languages. Step-by-step assistance with simple explanations — no accounting knowledge required."
+        "body": "Support in 10 languages. Step-by-step assistance with simple explanations \u2014 no accounting knowledge required."
       },
       {
         "title": "Built for Families",
@@ -87,65 +87,131 @@
     "groups": [
       {
         "title": "Income Forms",
-        "items": ["W-2", "1099-NEC", "1099-MISC", "1099-K", "1099-INT / 1099-DIV", "SSA-1099", "1099-R"]
+        "items": [
+          "W-2",
+          "1099-NEC",
+          "1099-MISC",
+          "1099-K",
+          "1099-INT / 1099-DIV",
+          "SSA-1099",
+          "1099-R"
+        ]
       },
       {
         "title": "Health & Benefits",
-        "items": ["1095-A (Marketplace Health Insurance)", "1095-B / 1095-C"]
+        "items": [
+          "1095-A (Marketplace Health Insurance)",
+          "1095-B / 1095-C"
+        ]
       },
       {
         "title": "Gig & Freelance",
-        "items": ["Schedule C", "Vehicle mileage", "Business expenses", "Depreciation & supplies"]
+        "items": [
+          "Schedule C",
+          "Vehicle mileage",
+          "Business expenses",
+          "Depreciation & supplies"
+        ]
       },
       {
         "title": "Family & Credits",
-        "items": ["Child Tax Credit", "Earned Income Tax Credit", "Dependent care credits"]
+        "items": [
+          "Child Tax Credit",
+          "Earned Income Tax Credit",
+          "Dependent care credits"
+        ]
       },
       {
         "title": "State Filing",
-        "items": ["All U.S. states and local jurisdictions supported."]
+        "items": [
+          "All U.S. states and local jurisdictions supported."
+        ]
       }
     ]
   },
   "features": {
     "title": "Advanced AI Features Made for Fast and Accurate Filing",
     "items": [
-      {"title": "OCR & Smart Document Classifier", "body": "Extracts and classifies information from tax documents with 99.9% accuracy."},
-      {"title": "Multilingual Adaptive Q&A", "body": "Our AI adapts to your situation and asks only the relevant questions — in your preferred language."},
-      {"title": "Tax Law Guidance", "body": "Real-time explanations of deductions, credits, and IRS/state rules updated daily."},
-      {"title": "Draft Return Builder", "body": "Instantly generates a complete draft of your tax return based on your uploaded documents."},
-      {"title": "Compliance & Security", "body": "Bank-level encryption, secure storage, and IRS-aligned privacy requirements."},
-      {"title": "State & Federal Filing Addresses", "body": "Automatically provides correct IRS and state mailing addresses for your location."}
+      {
+        "title": "OCR & Smart Document Classifier",
+        "body": "Extracts and classifies information from tax documents with 99.9% accuracy."
+      },
+      {
+        "title": "Multilingual Adaptive Q&A",
+        "body": "Our AI adapts to your situation and asks only the relevant questions \u2014 in your preferred language."
+      },
+      {
+        "title": "Tax Law Guidance",
+        "body": "Real-time explanations of deductions, credits, and IRS/state rules updated daily."
+      },
+      {
+        "title": "Draft Return Builder",
+        "body": "Instantly generates a complete draft of your tax return based on your uploaded documents."
+      },
+      {
+        "title": "Compliance & Security",
+        "body": "Bank-level encryption, secure storage, and IRS-aligned privacy requirements."
+      },
+      {
+        "title": "State & Federal Filing Addresses",
+        "body": "Automatically provides correct IRS and state mailing addresses for your location."
+      }
     ]
   },
   "how": {
-    "title": "How It Works — File Your Taxes in 3 Simple Steps",
+    "title": "How It Works \u2014 File Your Taxes in 3 Simple Steps",
     "steps": [
-      {"title": "Upload Documents", "body": "Upload your W-2, 1099s, receipts, or statements using our encrypted platform."},
-      {"title": "AI Processing", "body": "Our AI reads your documents, validates information, applies deductions, and calculates your tax return automatically."},
-      {"title": "Review & File", "body": "Preview your completed tax return, make adjustments if needed, and file with federal and state authorities."}
+      {
+        "title": "Upload Documents",
+        "body": "Upload your W-2, 1099s, receipts, or statements using our encrypted platform."
+      },
+      {
+        "title": "AI Processing",
+        "body": "Our AI reads your documents, validates information, applies deductions, and calculates your tax return automatically."
+      },
+      {
+        "title": "Review & File",
+        "body": "Preview your completed tax return, make adjustments if needed, and file with federal and state authorities."
+      }
     ],
     "cta": "Start Filing Now"
   },
   "pricing": {
-    "title": "Simple, Transparent Pricing — No Monthly Fees",
+    "title": "Simple, Transparent Pricing \u2014 No Monthly Fees",
     "plans": [
       {
-        "name": "Registration Fee — $9.99 (lifetime access)",
+        "name": "Registration Fee \u2014 $9.99 (lifetime access)",
         "badge": "",
-        "features": ["Lifetime account access", "Secure document storage", "Basic tax guidance", "Email support"],
+        "features": [
+          "Lifetime account access",
+          "Secure document storage",
+          "Basic tax guidance",
+          "Email support"
+        ],
         "cta": "File Now"
       },
       {
-        "name": "Individual Tax Return — $19.99",
+        "name": "Individual Tax Return \u2014 $19.99",
         "badge": "Most Popular",
-        "features": ["Federal & state filing", "Maximum refund calculation", "Audit assistance", "Priority email support"],
+        "features": [
+          "Federal & state filing",
+          "Maximum refund calculation",
+          "Audit assistance",
+          "Priority email support"
+        ],
         "cta": "File Now"
       },
       {
-        "name": "Family Tax Return — $24.99",
+        "name": "Family Tax Return \u2014 $24.99",
         "badge": "Best Value for Couples",
-        "features": ["Joint return preparation", "Dependents included", "Child Tax Credit support", "Earned Income Credit support", "Maximum refund guarantee", "Priority support"],
+        "features": [
+          "Joint return preparation",
+          "Dependents included",
+          "Child Tax Credit support",
+          "Earned Income Credit support",
+          "Maximum refund guarantee",
+          "Priority support"
+        ],
         "cta": "File Now"
       }
     ]
@@ -154,10 +220,22 @@
     "title": "Security & IRS Compliance",
     "intro": "Your privacy and security are our top priority.",
     "items": [
-      {"title": "Bank-Level Encryption", "body": "All tax documents are encrypted during upload, processing, and storage."},
-      {"title": "Secure Document Storage", "body": "Your information is never shared or sold. Documents can be deleted anytime."},
-      {"title": "IRS Compliance", "body": "TaxHelp AI follows IRS Publication 1345 and IRS data-protection standards.\nWe are preparing for IRS e-File Provider certification in 2026."},
-      {"title": "Data Confidentiality", "body": "We never use your documents to train AI models."}
+      {
+        "title": "Bank-Level Encryption",
+        "body": "All tax documents are encrypted during upload, processing, and storage."
+      },
+      {
+        "title": "Secure Document Storage",
+        "body": "Your information is never shared or sold. Documents can be deleted anytime."
+      },
+      {
+        "title": "IRS Compliance",
+        "body": "TaxHelp AI follows IRS Publication 1345 and IRS data-protection standards.\nWe are preparing for IRS e-File Provider certification in 2026."
+      },
+      {
+        "title": "Data Confidentiality",
+        "body": "We never use your documents to train AI models."
+      }
     ]
   },
   "serve": {
@@ -165,19 +243,37 @@
     "groups": [
       {
         "title": "Gig Workers & Freelancers",
-        "items": ["DoorDash, UberEats, Instacart, Lyft, Uber, TaskRabbit, Amazon Flex", "Automatic mileage tracking", "Business expense optimization", "Schedule C supported"]
+        "items": [
+          "DoorDash, UberEats, Instacart, Lyft, Uber, TaskRabbit, Amazon Flex",
+          "Automatic mileage tracking",
+          "Business expense optimization",
+          "Schedule C supported"
+        ]
       },
       {
         "title": "Immigrants & Non-Native English Speakers",
-        "items": ["10 languages supported", "Simple explanations", "Step-by-step assistance"]
+        "items": [
+          "10 languages supported",
+          "Simple explanations",
+          "Step-by-step assistance"
+        ]
       },
       {
         "title": "Families",
-        "items": ["Dependents and children", "Child Tax Credit", "Joint filing for married couples"]
+        "items": [
+          "Dependents and children",
+          "Child Tax Credit",
+          "Joint filing for married couples"
+        ]
       },
       {
         "title": "Seniors & Retirees",
-        "items": ["SSA-1099", "Pension income", "Medical deductions", "Clear, simple instructions"]
+        "items": [
+          "SSA-1099",
+          "Pension income",
+          "Medical deductions",
+          "Clear, simple instructions"
+        ]
       }
     ]
   },
@@ -216,11 +312,26 @@
   "faq": {
     "title": "FAQ",
     "items": [
-      {"question": "What is the registration fee for?", "answer": "It provides lifetime access to your account, secure document storage, and basic AI tax guidance."},
-      {"question": "When do I pay the filing fees?", "answer": "You only pay when you choose to file your completed tax return."},
-      {"question": "Is my data secure?", "answer": "Yes. All documents and information are fully encrypted and stored securely."},
-      {"question": "Can I file taxes for multiple years?", "answer": "Yes. You can upload past documents and file previous years’ returns."},
-      {"question": "Do you support all U.S. states?", "answer": "Yes — all states and local jurisdictions are supported."}
+      {
+        "question": "What is the registration fee for?",
+        "answer": "It provides lifetime access to your account, secure document storage, and basic AI tax guidance."
+      },
+      {
+        "question": "When do I pay the filing fees?",
+        "answer": "You only pay when you choose to file your completed tax return."
+      },
+      {
+        "question": "Is my data secure?",
+        "answer": "Yes. All documents and information are fully encrypted and stored securely."
+      },
+      {
+        "question": "Can I file taxes for multiple years?",
+        "answer": "Yes. You can upload past documents and file previous years\u2019 returns."
+      },
+      {
+        "question": "Do you support all U.S. states?",
+        "answer": "Yes \u2014 all states and local jurisdictions are supported."
+      }
     ]
   },
   "cta": {
@@ -402,7 +513,12 @@
         "title": "Unable to load draft",
         "detail": "Refresh the page or upload again."
       },
-      "loading": "Loading draft summary..."
+      "loading": "Loading draft summary...",
+      "gating": {
+        "title": "Plan required to export",
+        "description": "Complete checkout to unlock downloads and e-file handoff.",
+        "cta": "Unlock export"
+      }
     },
     "export": {
       "title": "Export or e-file",
@@ -437,6 +553,11 @@
       "errors": {
         "title": "Consent failed",
         "detail": "Please try saving consent again."
+      },
+      "gating": {
+        "title": "Payment required",
+        "description": "Complete the registration purchase to enable downloads and e-file handoff.",
+        "cta": "Go to checkout"
       }
     },
     "auth": {
@@ -449,9 +570,32 @@
       "stubHint": "Demo mode shares the code directly on screen.",
       "invalid": "Invalid or expired code. Please retry.",
       "logout": "Log out",
-      "demoBanner": "Demo mode active — authentication and payments are simulated.",
+      "demoBanner": "Demo mode active \u2014 authentication and payments are simulated.",
       "noAccount": "Need an account? Enter your email to start.",
       "otpSent": "Verification code sent"
+    },
+    "checkout": {
+      "title": "Confirm your {plan} plan",
+      "subtitle": "Secure checkout \u2014 required to unlock export and filing.",
+      "features": {
+        "access": "Lifetime account access",
+        "storage": "Secure document storage",
+        "guidance": "Basic AI guidance",
+        "priority": "Priority support"
+      },
+      "simulate": "Simulate payment",
+      "pay": "Pay with Stripe",
+      "processing": "Processing...",
+      "back": "Back to export",
+      "maybeLater": "Maybe later",
+      "errors": {
+        "title": "Checkout unavailable",
+        "detail": "Please try again or use demo mode."
+      },
+      "success": {
+        "title": "Plan unlocked",
+        "detail": "You can now export and continue filing."
+      }
     }
   }
 }

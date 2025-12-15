@@ -54,8 +54,14 @@ export default function ReviewPage() {
   const { toast } = useToast();
   const t = useTranslations("flow.review");
   const [draft, setDraft] = useState<DraftResponse | null>(null);
+  const [hasEntitlement, setHasEntitlement] = useState<boolean>(true);
 
   useEffect(() => {
+    fetch("/api/entitlements/me")
+      .then((res) => res.json())
+      .then((data) => setHasEntitlement(Boolean(data.entitlement)))
+      .catch(() => setHasEntitlement(false));
+
     if (!state.uploadId) {
       router.push("/upload");
       return;
@@ -99,8 +105,20 @@ export default function ReviewPage() {
           </div>
           <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
-        <Button onClick={() => router.push("/export")}>{t("goExport")}</Button>
+        <Button onClick={() => router.push(hasEntitlement ? "/export" : "/checkout?plan=registration")}>{t("goExport")}</Button>
       </div>
+
+      {!hasEntitlement && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold">{t("gating.title")}</p>
+              <p>{t("gating.description")}</p>
+            </div>
+            <Button size="sm" onClick={() => router.push("/checkout?plan=registration")}>{t("gating.cta")}</Button>
+          </div>
+        </div>
+      )}
 
       <Tabs defaultValue="summary" className="space-y-4">
         <TabsList>

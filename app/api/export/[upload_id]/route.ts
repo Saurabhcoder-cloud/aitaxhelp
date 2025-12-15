@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
-import { getUpload, updateUploadStatus } from "@/lib/store/uploads";
+import { cookies } from "next/headers";
+import { isStubMode } from "@/lib/env";
+import { uploadStore, authStore, entitlementStore } from "@/lib/store";
 
 export async function GET(
   _req: Request,
   { params, url }: { params: { upload_id: string }; url: string }
 ) {
+  const sessionId = cookies().get("sessionId")?.value;
+  const session = authStore.getSession(sessionId);
+  if (!session && !isStubMode()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const entitlement = session ? entitlementStore.getEntitlement(session.userId) : undefined;
+  if (!entitlement && !isStubMode()) return NextResponse.json({ error: "payment_required" }, { status: 402 });
+
   const { upload_id } = params;
   const search = new URL(url).searchParams;
   const type = search.get("type") ?? "pdf";
@@ -22,8 +30,25 @@ export async function POST(
   req: Request,
   { params }: { params: { upload_id: string } }
 ) {
+  const sessionId = cookies().get("sessionId")?.value;
+  const session = authStore.getSession(sessionId);
+  if (!session && !isStubMode()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const entitlement = session ? entitlementStore.getEntitlement(session.userId) : undefined;
+  if (!entitlement && !isStubMode()) return NextResponse.json({ error: "payment_required" }, { status: 402 });
+
   const { upload_id } = params;
-  const existing = getUpload(upload_id);
+  const timestamp = new Date().toISOString();
+  let existing = uploadStore.getUpload(upload_id);
+
+  if (!existing && isStubMode()) {
+    existing = uploadStore.createUpload({
+      id: upload_id,
+      filename: "stub.pdf",
+      size: 0,
+      type: "application/pdf",
+      uploadedAt: timestamp,
+    });
+  }
 
   if (!existing) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
@@ -31,9 +56,8 @@ export async function POST(
 
   const body = await req.json().catch(() => null) as { locale?: string } | null;
   const locale = body?.locale ?? "en";
-  const timestamp = new Date().toISOString();
 
-  const updated = updateUploadStatus(upload_id, {
+  const updated = uploadStore.updateUploadStatus(upload_id, {
     status: "consented",
     consent: { timestamp, locale },
   });

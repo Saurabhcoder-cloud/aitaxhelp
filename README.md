@@ -33,8 +33,8 @@ npm run ci # runs lint, typecheck, then build
 ### Modes and environment
 
 - Copy `.env.example` to `.env.local` and fill in the values you need.
-- `STUB_MODE=true` (default) keeps all integrations in local/demo JSON stores so the app works offline or without paid providers.
-- `STUB_MODE=false` enables the production adapters for auth, payments, storage, and news; provide Stripe keys, email credentials, and database/storage URLs.
+- `STUB_MODE=true` (default) keeps all integrations in local/demo JSON stores so the app works offline or without paid providers. Auth + checkout can be simulated via `/login` and `/checkout` → `Simulate payment`.
+- `STUB_MODE=false` enables production adapters for auth, payments, storage, and news; provide Stripe keys, email credentials, and database/storage URLs.
 - If `npm install` fails due to registry limitations, set a registry mirror (`npm config set registry https://registry.npmjs.org`) or use an offline cache.
 
 ## Tech stack
@@ -57,12 +57,31 @@ npm run ci # runs lint, typecheck, then build
 2. `/upload` – drag-and-drop upload with client-side type/size checks and data handling note
 3. `/processing` – simulated progress with OCR/classification/validation steps
 4. `/review` – mocked refund summary, draft forms, and adaptive Q&A placeholders
-5. `/export` – consent checkbox plus download stubs for PDF/JSON/CSV and e-file handoff placeholder
+5. `/export` – consent checkbox plus download stubs for PDF/JSON/CSV and e-file handoff placeholder; locked behind entitlement when `STUB_MODE=false`
+6. `/checkout` – plan selection with Stripe-ready endpoints (stubbed in demo mode)
+7. `/account` – entitlement status, logout, and data deletion placeholder
+
+### Smoke test (stub mode)
+With `STUB_MODE=true` and `npm run dev` running on `localhost:3000`, you can exercise the auth + entitlement + export gate via Node fetch:
+
+```bash
+node scripts/smoke.js
+```
+
+The script requests an OTP, verifies it, grants a stub entitlement, and ensures the export API responds once consent is saved.
 
 ## Extending functionality
 - Replace stub APIs in `app/api/*` with real OCR, classification, and tax engine integrations.
 - Connect exports to real PDF/JSON/CSV builders and an e-file provider.
 - Populate non-English message catalogs under `lib/messages/locales.ts`.
+- Swap the file-backed stores in `lib/store/*` for Prisma/Postgres implementations while keeping the adapter surface intact.
 
 ## Testing
-No automated tests are included yet. Add Playwright or React Testing Library coverage as you extend the app.
+No automated browser tests are included yet. Add Playwright or React Testing Library coverage as you extend the app.
+
+## Go-live checklist
+- Configure DNS to point to your deployment host.
+- Set environment variables: `STUB_MODE`, `DATABASE_URL`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, email provider creds, and storage credentials.
+- Create Stripe webhook pointing to `/api/webhooks/stripe` with the signing secret.
+- Ensure storage bucket/policy allows private uploads and signed download URLs only.
+- Run database migrations/seeds for auth/uploads/entitlements when swapping out the JSON stores.

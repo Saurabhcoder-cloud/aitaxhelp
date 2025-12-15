@@ -23,6 +23,7 @@ export default function ExportPage() {
   const [consent, setConsent] = useState(false);
   const [downloading, setDownloading] = useState<ExportType | null>(null);
   const [record, setRecord] = useState<UploadRecord | null>(null);
+  const [hasEntitlement, setHasEntitlement] = useState<boolean>(true);
 
   useEffect(() => {
     if (!state.uploadId) {
@@ -33,6 +34,10 @@ export default function ExportPage() {
       .then((res) => res.json())
       .then((data) => setRecord(data.upload))
       .catch(() => setRecord(null));
+    fetch("/api/entitlements/me")
+      .then((res) => res.json())
+      .then((data) => setHasEntitlement(Boolean(data.entitlement)))
+      .catch(() => setHasEntitlement(false));
   }, [state.uploadId, router]);
 
   useEffect(() => {
@@ -49,7 +54,7 @@ export default function ExportPage() {
   }, [consent, state.uploadId, locale, toast, t, updateState]);
 
   const handleDownload = async (type: ExportType) => {
-    if (!state.uploadId || !consent) return;
+    if (!state.uploadId || !consent || !hasEntitlement) return;
     setDownloading(type);
     const res = await fetch(`/api/export/${state.uploadId}?type=${type}`);
     const blob = await res.blob();
@@ -84,6 +89,17 @@ export default function ExportPage() {
           <CardDescription>{t("consent.description")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {!hasEntitlement && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-semibold">{t("gating.title")}</p>
+                  <p>{t("gating.description")}</p>
+                </div>
+                <Button size="sm" onClick={() => router.push("/checkout?plan=registration")}>{t("gating.cta")}</Button>
+              </div>
+            </div>
+          )}
           <label className="flex items-start gap-3 text-sm text-muted-foreground">
             <Checkbox
               checked={consent}
@@ -95,7 +111,7 @@ export default function ExportPage() {
             {exportTypes.map((type) => (
               <Button
                 key={type}
-                disabled={!consent || downloading === type}
+                disabled={!consent || downloading === type || !hasEntitlement}
                 variant="secondary"
                 onClick={() => handleDownload(type)}
               >

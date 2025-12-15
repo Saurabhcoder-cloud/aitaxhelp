@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { isStubMode } from "@/lib/env";
 
-export default function LoginPage() {
+function LoginPageInner() {
   const t = useTranslations("flow.auth");
   const router = useRouter();
   const params = useSearchParams();
@@ -80,5 +80,13 @@ export default function LoginPage() {
       </Card>
       <p className="mt-4 text-sm text-muted-foreground">{t("noAccount")}</p>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="container max-w-xl py-12 text-sm text-muted-foreground">Loading...</div>}>
+      <LoginPageInner />
+    </Suspense>
   );
 }

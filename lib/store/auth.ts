@@ -43,6 +43,11 @@ export const findUserByEmail = (email: string): User | undefined => {
   return data.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
 };
 
+export const getUserById = (id: string): User | undefined => {
+  const data = ensureStore();
+  return data.users.find((u) => u.id === id);
+};
+
 export const createUser = (email: string): User => {
   const data = ensureStore();
   const existing = findUserByEmail(email);
@@ -79,6 +84,13 @@ export const getSession = (id?: string): Session | undefined => {
   if (!id) return undefined;
   const data = ensureStore();
   return data.sessions.find((s) => s.id === id);
+};
+
+export const deleteSession = (id?: string) => {
+  if (!id) return;
+  const data = ensureStore();
+  data.sessions = data.sessions.filter((s) => s.id !== id);
+  saveStore(data);
 };
 
 export const createEntitlement = (
