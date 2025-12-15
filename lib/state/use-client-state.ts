@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import type { UploadStatus } from "@/lib/store/uploads";
 
 export interface FlowState {
   language?: string;
   uploadId?: string;
   fileName?: string;
+  uploadStatus?: UploadStatus;
 }
 
 const STORAGE_KEY = "taxhelp-flow";
@@ -24,10 +26,13 @@ export function useClientState() {
     }
   }, []);
 
-  const updateState = (next: FlowState) => {
-    setState(next);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  };
+  const updateState = useCallback((next: Partial<FlowState>) => {
+    setState((prev) => {
+      const merged = { ...prev, ...next };
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      return merged;
+    });
+  }, []);
 
   return { state, updateState };
 }

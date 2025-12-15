@@ -23,38 +23,32 @@ export function HeroSection() {
             </Link>
           </div>
           <div className="rounded-lg border border-primary/20 bg-white/70 p-4 text-sm shadow-sm">
-            <p className="font-semibold">Workflow</p>
+            <p className="font-semibold">{t("workflowTitle")}</p>
             <ul className="mt-2 space-y-1 text-muted-foreground">
-              <li>Language detect/selection</li>
-              <li>Upload tax document (PDF/JPG/PNG, &lt;=10MB)</li>
-              <li>OCR + document classifier (stubbed)</li>
-              <li>Data extraction + validation (stub)</li>
-              <li>Adaptive Q&amp;A in user language (UI stub)</li>
-              <li>Tax &amp; benefits engine (stub calculation)</li>
-              <li>Draft return builder (stub)</li>
-              <li>Refund &amp; benefits summary</li>
-              <li>Export / review / e-file handoff</li>
+              {(t.raw("workflowSteps") as string[]).map((step) => (
+                <li key={step}>{step}</li>
+              ))}
             </ul>
           </div>
         </div>
         <div className="grid gap-4 rounded-xl border border-border bg-white/80 p-6 shadow-sm">
           <div className="rounded-lg border border-dashed border-primary/30 bg-primary/5 p-4 text-sm">
-            <p className="font-semibold">Secure Upload</p>
-            <p className="text-muted-foreground">Drag &amp; drop PDFs, JPGs, or PNGs. Client-side checks prevent oversized or unsupported files.</p>
+            <p className="font-semibold">{t("secureUploadTitle")}</p>
+            <p className="text-muted-foreground">{t("secureUploadText")}</p>
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-lg border border-border bg-secondary p-3">
-              <p className="font-semibold">Multilingual</p>
-              <p className="text-muted-foreground">10 languages with translation-ready UI.</p>
+              <p className="font-semibold">{t("multilingualTitle")}</p>
+              <p className="text-muted-foreground">{t("multilingualText")}</p>
             </div>
             <div className="rounded-lg border border-border bg-secondary p-3">
-              <p className="font-semibold">IRS Ready</p>
-              <p className="text-muted-foreground">Security, encryption, and privacy-first defaults.</p>
+              <p className="font-semibold">{t("irsReadyTitle")}</p>
+              <p className="text-muted-foreground">{t("irsReadyText")}</p>
             </div>
           </div>
           <div className="rounded-lg border border-border bg-muted/60 p-4 text-sm">
-            <p className="font-semibold">Start Filing in Minutes</p>
-            <p className="text-muted-foreground">Guided steps from upload to export and e-file handoff.</p>
+            <p className="font-semibold">{t("startBadgeTitle")}</p>
+            <p className="text-muted-foreground">{t("startBadgeText")}</p>
           </div>
         </div>
       </div>

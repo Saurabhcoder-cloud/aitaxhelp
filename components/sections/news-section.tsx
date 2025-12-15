@@ -1,10 +1,10 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { mockedNews } from "@/lib/api/news";
 import { useTranslations } from "next-intl";
 
 export function NewsSection() {
   const t = useTranslations("news");
+  const items = (t.raw("items") as { date: string; title: string; summary: string }[]) || [];
   return (
     <section id="news" className="border-b border-border py-16">
       <div className="container space-y-6">
@@ -16,7 +16,7 @@ export function NewsSection() {
           <Badge>{t("badge")}</Badge>
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {mockedNews.map((item) => (
+          {items.map((item) => (
             <Card key={item.title} className="h-full">
               <CardHeader>
                 <CardTitle className="text-lg">{item.title}</CardTitle>

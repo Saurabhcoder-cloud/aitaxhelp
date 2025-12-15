@@ -1,19 +1,34 @@
 import { NextResponse } from "next/server";
+import { getUpload, updateUploadStatus } from "@/lib/store/uploads";
 
 export async function POST(
   _req: Request,
   { params }: { params: { upload_id: string } }
 ) {
   const { upload_id } = params;
-  const progress = Math.min(100, Math.floor(Math.random() * 40) * 3);
+  const existing = getUpload(upload_id);
+
+  if (!existing) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+
+  const nextProgress = Math.min(100, Math.max(existing.progress ?? 0, Math.floor(Math.random() * 35) * 3));
+  const status = nextProgress >= 100 ? "processed" : "processing";
+
+  const record = updateUploadStatus(upload_id, {
+    progress: nextProgress,
+    status,
+  });
+
   return NextResponse.json({
     upload_id,
-    progress,
+    progress: record?.progress ?? nextProgress,
+    status: record?.status ?? status,
     steps: [
-      { label: "OCR", status: progress > 20 ? "done" : "pending" },
-      { label: "Classification", status: progress > 50 ? "done" : "pending" },
-      { label: "Validation", status: progress > 70 ? "done" : "pending" },
-      { label: "Drafting", status: progress >= 100 ? "done" : "pending" },
+      { key: "ocr", status: (record?.progress ?? nextProgress) > 20 ? "done" : "pending" },
+      { key: "classification", status: (record?.progress ?? nextProgress) > 50 ? "done" : "pending" },
+      { key: "validation", status: (record?.progress ?? nextProgress) > 70 ? "done" : "pending" },
+      { key: "drafting", status: (record?.progress ?? nextProgress) >= 100 ? "done" : "pending" },
     ],
     extracted: {
       filerName: "Jordan Lee",
@@ -21,5 +36,6 @@ export async function POST(
       income: 52000,
       deductions: 8200,
     },
+    audit: record?.audit,
   });
 }

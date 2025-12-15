@@ -9,6 +9,8 @@ npm install
 npm run dev
 ```
 
+If you encounter a registry access error (e.g., 403), try setting an alternate npm registry (`npm config set registry https://registry.npmjs.org`) or using an offline cache/mirror. The codebase relies only on the dependencies in `package.json`, so installing in an environment with registry access will unblock `npm install`.
+
 ## Tech stack
 - Next.js 14 (App Router) with TypeScript
 - TailwindCSS + shadcn-inspired UI components
@@ -21,7 +23,7 @@ npm run dev
 - `components/sections/` – reusable landing page sections
 - `components/ui/` – shadcn-style primitives (Button, Card, Accordion, Tabs, Dialog, Toast, etc.)
 - `lib/messages/` – i18n message catalogs
-- `lib/store/` – in-memory upload metadata store for API stubs
+- `lib/store/` – file-backed upload metadata store for API stubs
 
 ## Implemented flow
 1. `/start` – language selection ready for expansion to additional locales
