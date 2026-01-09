@@ -1,0 +1,601 @@
+{
+  "meta": {
+    "title": "TaxHelp AI",
+    "description": "AI-Powered Tax Filing for Everyone \u2014 simple, accurate, affordable."
+  },
+  "nav": {
+    "hero": "Hero",
+    "why": "Why Different",
+    "forms": "Supported Forms",
+    "features": "Key Features",
+    "how": "How It Works",
+    "pricing": "Pricing",
+    "security": "Security",
+    "serve": "Who We Serve",
+    "news": "Daily Tax News",
+    "faq": "FAQ",
+    "cta": "Start Filing Now"
+  },
+  "languages": [
+    "English",
+    "Spanish",
+    "French",
+    "German",
+    "Chinese",
+    "Arabic",
+    "Hindi",
+    "Portuguese",
+    "Russian",
+    "Japanese"
+  ],
+  "hero": {
+    "title": "AI-Powered Tax Filing for Everyone \u2014 Simple, Accurate, Affordable",
+    "subtitle": "File your taxes with a multilingual AI assistant designed for gig workers, families, seniors, immigrants, and low-income households.",
+    "ctaPrimary": "Start Filing Now",
+    "ctaSecondary": "Upload Tax Documents",
+    "detail": "Upload your W-2, 1099, or receipts \u2014 get instant calculations \u2014 file with confidence.",
+    "workflowTitle": "Workflow",
+    "workflowSteps": [
+      "Language detect/selection",
+      "Upload tax document (PDF/JPG/PNG, <=10MB)",
+      "OCR + document classifier (stubbed)",
+      "Data extraction + validation (stub)",
+      "Adaptive Q&A in user language (UI stub)",
+      "Tax & benefits engine (stub calculation)",
+      "Draft return builder (stub)",
+      "Refund & benefits summary",
+      "Export / review / e-file handoff"
+    ],
+    "secureUploadTitle": "Secure Upload",
+    "secureUploadText": "Drag & drop PDFs, JPGs, or PNGs. Client-side checks prevent oversized or unsupported files.",
+    "multilingualTitle": "Multilingual",
+    "multilingualText": "10 languages with translation-ready UI.",
+    "irsReadyTitle": "IRS Ready",
+    "irsReadyText": "Security, encryption, and privacy-first defaults.",
+    "startBadgeTitle": "Start Filing in Minutes",
+    "startBadgeText": "Guided steps from upload to export and e-file handoff."
+  },
+  "why": {
+    "title": "Why TaxHelp AI Is Different",
+    "subtitle": "Most tax platforms are built for accountants or high-income users.\nWe built TaxHelp AI for real people.",
+    "items": [
+      {
+        "title": "Built for Gig Workers",
+        "body": "DoorDash, UberEats, Lyft, Instacart, Uber, Amazon Flex \u2014 automatic mileage, vehicle expenses, tips, and gig-income deductions."
+      },
+      {
+        "title": "Built for Immigrants",
+        "body": "Support in 10 languages. Step-by-step assistance with simple explanations \u2014 no accounting knowledge required."
+      },
+      {
+        "title": "Built for Families",
+        "body": "Automatic Child Tax Credit, Earned Income Credit, dependents, and joint filings."
+      },
+      {
+        "title": "Built for Seniors",
+        "body": "Clear and simple help with Social Security (SSA-1099), retirement income, and medical deductions."
+      },
+      {
+        "title": "Built for Low-Income Households",
+        "body": "Affordable pricing and free filing for selected groups when grant funding becomes available."
+      }
+    ]
+  },
+  "forms": {
+    "title": "Supported Tax Forms",
+    "intro": "TaxHelp AI supports all major U.S. federal and state forms, including:",
+    "groups": [
+      {
+        "title": "Income Forms",
+        "items": [
+          "W-2",
+          "1099-NEC",
+          "1099-MISC",
+          "1099-K",
+          "1099-INT / 1099-DIV",
+          "SSA-1099",
+          "1099-R"
+        ]
+      },
+      {
+        "title": "Health & Benefits",
+        "items": [
+          "1095-A (Marketplace Health Insurance)",
+          "1095-B / 1095-C"
+        ]
+      },
+      {
+        "title": "Gig & Freelance",
+        "items": [
+          "Schedule C",
+          "Vehicle mileage",
+          "Business expenses",
+          "Depreciation & supplies"
+        ]
+      },
+      {
+        "title": "Family & Credits",
+        "items": [
+          "Child Tax Credit",
+          "Earned Income Tax Credit",
+          "Dependent care credits"
+        ]
+      },
+      {
+        "title": "State Filing",
+        "items": [
+          "All U.S. states and local jurisdictions supported."
+        ]
+      }
+    ]
+  },
+  "features": {
+    "title": "Advanced AI Features Made for Fast and Accurate Filing",
+    "items": [
+      {
+        "title": "OCR & Smart Document Classifier",
+        "body": "Extracts and classifies information from tax documents with 99.9% accuracy."
+      },
+      {
+        "title": "Multilingual Adaptive Q&A",
+        "body": "Our AI adapts to your situation and asks only the relevant questions \u2014 in your preferred language."
+      },
+      {
+        "title": "Tax Law Guidance",
+        "body": "Real-time explanations of deductions, credits, and IRS/state rules updated daily."
+      },
+      {
+        "title": "Draft Return Builder",
+        "body": "Instantly generates a complete draft of your tax return based on your uploaded documents."
+      },
+      {
+        "title": "Compliance & Security",
+        "body": "Bank-level encryption, secure storage, and IRS-aligned privacy requirements."
+      },
+      {
+        "title": "State & Federal Filing Addresses",
+        "body": "Automatically provides correct IRS and state mailing addresses for your location."
+      }
+    ]
+  },
+  "how": {
+    "title": "How It Works \u2014 File Your Taxes in 3 Simple Steps",
+    "steps": [
+      {
+        "title": "Upload Documents",
+        "body": "Upload your W-2, 1099s, receipts, or statements using our encrypted platform."
+      },
+      {
+        "title": "AI Processing",
+        "body": "Our AI reads your documents, validates information, applies deductions, and calculates your tax return automatically."
+      },
+      {
+        "title": "Review & File",
+        "body": "Preview your completed tax return, make adjustments if needed, and file with federal and state authorities."
+      }
+    ],
+    "cta": "Start Filing Now"
+  },
+  "pricing": {
+    "title": "Simple, Transparent Pricing \u2014 No Monthly Fees",
+    "plans": [
+      {
+        "name": "Registration Fee \u2014 $9.99 (lifetime access)",
+        "badge": "",
+        "features": [
+          "Lifetime account access",
+          "Secure document storage",
+          "Basic tax guidance",
+          "Email support"
+        ],
+        "cta": "File Now"
+      },
+      {
+        "name": "Individual Tax Return \u2014 $19.99",
+        "badge": "Most Popular",
+        "features": [
+          "Federal & state filing",
+          "Maximum refund calculation",
+          "Audit assistance",
+          "Priority email support"
+        ],
+        "cta": "File Now"
+      },
+      {
+        "name": "Family Tax Return \u2014 $24.99",
+        "badge": "Best Value for Couples",
+        "features": [
+          "Joint return preparation",
+          "Dependents included",
+          "Child Tax Credit support",
+          "Earned Income Credit support",
+          "Maximum refund guarantee",
+          "Priority support"
+        ],
+        "cta": "File Now"
+      }
+    ]
+  },
+  "security": {
+    "title": "Security & IRS Compliance",
+    "intro": "Your privacy and security are our top priority.",
+    "items": [
+      {
+        "title": "Bank-Level Encryption",
+        "body": "All tax documents are encrypted during upload, processing, and storage."
+      },
+      {
+        "title": "Secure Document Storage",
+        "body": "Your information is never shared or sold. Documents can be deleted anytime."
+      },
+      {
+        "title": "IRS Compliance",
+        "body": "TaxHelp AI follows IRS Publication 1345 and IRS data-protection standards.\nWe are preparing for IRS e-File Provider certification in 2026."
+      },
+      {
+        "title": "Data Confidentiality",
+        "body": "We never use your documents to train AI models."
+      }
+    ]
+  },
+  "serve": {
+    "title": "Who Can Use TaxHelp AI?",
+    "groups": [
+      {
+        "title": "Gig Workers & Freelancers",
+        "items": [
+          "DoorDash, UberEats, Instacart, Lyft, Uber, TaskRabbit, Amazon Flex",
+          "Automatic mileage tracking",
+          "Business expense optimization",
+          "Schedule C supported"
+        ]
+      },
+      {
+        "title": "Immigrants & Non-Native English Speakers",
+        "items": [
+          "10 languages supported",
+          "Simple explanations",
+          "Step-by-step assistance"
+        ]
+      },
+      {
+        "title": "Families",
+        "items": [
+          "Dependents and children",
+          "Child Tax Credit",
+          "Joint filing for married couples"
+        ]
+      },
+      {
+        "title": "Seniors & Retirees",
+        "items": [
+          "SSA-1099",
+          "Pension income",
+          "Medical deductions",
+          "Clear, simple instructions"
+        ]
+      }
+    ]
+  },
+  "news": {
+    "title": "Daily U.S. Tax Law Updates",
+    "intro": "Stay informed with real-time updates on IRS rules, federal changes, and state-specific tax adjustments.",
+    "badge": "Updated daily",
+    "items": [
+      {
+        "date": "2024-12-01",
+        "title": "IRS updates standard mileage rates",
+        "summary": "Latest mileage deduction guidance for gig drivers and self-employed workers."
+      },
+      {
+        "date": "2024-11-28",
+        "title": "State filing deadline adjustments",
+        "summary": "Several states announced deadline relief for disaster-impacted counties."
+      },
+      {
+        "date": "2024-11-25",
+        "title": "Earned Income Credit table refreshed",
+        "summary": "Income thresholds updated for families and single filers for the new tax year."
+      },
+      {
+        "date": "2024-11-20",
+        "title": "Marketplace health coverage reminders",
+        "summary": "Form 1095-A distribution timelines published for marketplace enrollees."
+      },
+      {
+        "date": "2024-11-18",
+        "title": "IRS warns about new phishing trends",
+        "summary": "Security bulletin on avoiding scams targeting e-file credentials and refunds."
+      }
+    ]
+  },
+  "faq": {
+    "title": "FAQ",
+    "items": [
+      {
+        "question": "What is the registration fee for?",
+        "answer": "It provides lifetime access to your account, secure document storage, and basic AI tax guidance."
+      },
+      {
+        "question": "When do I pay the filing fees?",
+        "answer": "You only pay when you choose to file your completed tax return."
+      },
+      {
+        "question": "Is my data secure?",
+        "answer": "Yes. All documents and information are fully encrypted and stored securely."
+      },
+      {
+        "question": "Can I file taxes for multiple years?",
+        "answer": "Yes. You can upload past documents and file previous years\u2019 returns."
+      },
+      {
+        "question": "Do you support all U.S. states?",
+        "answer": "Yes \u2014 all states and local jurisdictions are supported."
+      }
+    ]
+  },
+  "cta": {
+    "title": "Start Filing Your Taxes Today",
+    "subtitle": "Affordable, multilingual, AI-powered tax preparation for everyone.",
+    "button": "Start Now"
+  },
+  "workflow": {
+    "dataHandling": "Your documents are encrypted, can be deleted anytime, and are never used for model training.",
+    "consent": "I consent to data handling and agree to the retention policy."
+  },
+  "flow": {
+    "start": {
+      "title": "Choose your language",
+      "description": "The assistant and adaptive Q&A will use your preferred language throughout the filing flow.",
+      "languageLabel": "Language",
+      "nameLabel": "Name (optional)",
+      "namePlaceholder": "Helps personalize your filing",
+      "detectionNote": "We can auto-detect languages from uploaded documents and questions to save time.",
+      "secureNote": "Secure, translation-ready workflow.",
+      "cta": "Start filing",
+      "resume": {
+        "title": "Resume filing",
+        "subtitle": "Recent uploads with status and timestamps.",
+        "refresh": "Refresh",
+        "empty": "No uploads yet. Start by adding your documents.",
+        "continue": "Continue",
+        "status": {
+          "uploaded": "Uploaded",
+          "processing": "Processing",
+          "processed": "Processed",
+          "drafted": "Draft built",
+          "consented": "Export consented"
+        }
+      }
+    },
+    "upload": {
+      "title": "Upload your tax documents",
+      "subtitle": "Drag & drop or browse for PDF, JPG, or PNG files (10MB max). We only store masked metadata and never train models on your data.",
+      "secureTitle": "Secure upload",
+      "secureDescription": "Client-side validation keeps your documents safe before processing.",
+      "dropTitle": "Drag & drop",
+      "dropSubtitle": "PDF, JPG, or PNG up to 10MB",
+      "browse": "Browse files",
+      "selected": "Selected: {name} ({type})",
+      "dataNote": "Data handling: encryption, delete anytime, never used for model training.",
+      "helper": "Need help? We guide you through W-2, 1099, and receipts.",
+      "cta": "Continue to processing",
+      "success": {
+        "title": "Upload saved",
+        "detail": "We are ready to process your documents."
+      },
+      "errors": {
+        "title": "Upload failed",
+        "generic": "Please try again",
+        "required": "File is required",
+        "type": "Unsupported file type",
+        "size": "File must be 10MB or smaller"
+      }
+    },
+    "processing": {
+      "title": "Processing your documents",
+      "subtitle": "OCR, classification, validation, and draft building are running.",
+      "progress": {
+        "title": "Progress",
+        "aria": "Processing {percent}%",
+        "done": "Complete",
+        "pending": "In progress",
+        "steps": {
+          "ocr": "OCR",
+          "classification": "Classification",
+          "validation": "Validation",
+          "drafting": "Drafting"
+        }
+      },
+      "note": "Adaptive Q&A will appear in your chosen language once validation finishes.",
+      "back": "Back",
+      "continue": "Continue to review",
+      "errors": {
+        "missingUpload": {
+          "title": "No upload",
+          "detail": "Please upload documents first."
+        }
+      }
+    },
+    "review": {
+      "title": "Review your draft return",
+      "subtitle": "Edit answers, confirm deductions, and preview filings.",
+      "stub": "Stub data",
+      "goExport": "Go to export",
+      "tabs": {
+        "summary": "Refund & benefits",
+        "forms": "Draft forms",
+        "qa": "Adaptive Q&A",
+        "audit": "Audit trail"
+      },
+      "cards": {
+        "overview": {
+          "title": "Refund & taxes",
+          "description": "Stubbed estimate; connect your tax engine later.",
+          "refund": "Refund estimate",
+          "estimate": "Tax due",
+          "effective": "Effective rate",
+          "credits": "Credits"
+        },
+        "actions": {
+          "title": "Next actions",
+          "description": "Validate these items before filing.",
+          "items": [
+            "Confirm mileage log and gig expenses.",
+            "Upload any missing 1099 forms.",
+            "Verify dependents and credits eligibility."
+          ]
+        },
+        "profile": {
+          "title": "Draft filer profile",
+          "description": "Stubbed extraction and calculation summary."
+        }
+      },
+      "fields": {
+        "filer": {
+          "title": "Filer",
+          "status": "Filing status",
+          "state": "State",
+          "dependents": "Dependents"
+        },
+        "income": {
+          "title": "Income",
+          "wages": "Wages",
+          "form1099": "1099 income",
+          "interest": "Interest",
+          "dividends": "Dividends"
+        },
+        "adjustments": {
+          "title": "Adjustments & deductions",
+          "method": "Standard or itemized",
+          "total": "Total deductions"
+        },
+        "credits": {
+          "ctc": "Child Tax Credit",
+          "eitc": "Earned Income Tax Credit",
+          "other": "Other credits"
+        }
+      },
+      "forms": {
+        "status": "Status: {status}",
+        "placeholder": "Editable preview placeholder.",
+        "edit": "Edit form"
+      },
+      "qa": {
+        "title": "Adaptive questions",
+        "description": "Rendered in your selected language.",
+        "items": [
+          "Do you have vehicle expenses beyond standard mileage?",
+          "Did you receive any state-specific credits or rebates?",
+          "Upload receipts for large deductions to validate."
+        ]
+      },
+      "assist": {
+        "title": "Assistance",
+        "description": "Document any clarifications for support.",
+        "detail": "We will keep notes with your return and surface during export.",
+        "addNote": "Add note"
+      },
+      "audit": {
+        "title": "Audit trail",
+        "description": "Track key milestones for this upload.",
+        "uploaded": "Uploaded",
+        "processed": "Processed",
+        "drafted": "Draft built",
+        "consented": "Export consented",
+        "pending": "Pending"
+      },
+      "stubBanner": {
+        "title": "Values are simulated",
+        "description": "Connect OCR, validation, and your tax engine to replace these stubs."
+      },
+      "errors": {
+        "title": "Unable to load draft",
+        "detail": "Refresh the page or upload again."
+      },
+      "loading": "Loading draft summary...",
+      "gating": {
+        "title": "Plan required to export",
+        "description": "Complete checkout to unlock downloads and e-file handoff.",
+        "cta": "Unlock export"
+      }
+    },
+    "export": {
+      "title": "Export or e-file",
+      "subtitle": "Download PDFs, JSON, or CSV and hand off to an e-file provider. Confirm consent before export.",
+      "consent": {
+        "title": "Consent & data retention",
+        "description": "Required before downloading or sending to an e-file partner.",
+        "text": "I consent to data handling and agree to the retention policy."
+      },
+      "downloads": {
+        "cta": "Download {type}",
+        "preparing": "Preparing...",
+        "ready": "{type} ready",
+        "detail": "Mock export completed."
+      },
+      "efile": "E-file handoff placeholder: connect IRS or state partners when ready.",
+      "audit": {
+        "title": "Audit trail",
+        "description": "Consent is captured with timestamp and locale.",
+        "uploaded": "Uploaded",
+        "processed": "Processed",
+        "drafted": "Draft built",
+        "consented": "Export consented",
+        "pending": "Pending"
+      },
+      "efileCta": {
+        "title": "E-file",
+        "description": "Connect provider integration.",
+        "cta": "Send to e-file partner"
+      },
+      "back": "Back to review",
+      "errors": {
+        "title": "Consent failed",
+        "detail": "Please try saving consent again."
+      },
+      "gating": {
+        "title": "Payment required",
+        "description": "Complete the registration purchase to enable downloads and e-file handoff.",
+        "cta": "Go to checkout"
+      }
+    },
+    "auth": {
+      "loginTitle": "Sign in to continue",
+      "loginDescription": "Use your email to receive a one-time code.",
+      "emailLabel": "Email",
+      "requestCode": "Send code",
+      "codeLabel": "Verification code",
+      "verify": "Verify and continue",
+      "stubHint": "Demo mode shares the code directly on screen.",
+      "invalid": "Invalid or expired code. Please retry.",
+      "logout": "Log out",
+      "demoBanner": "Demo mode active \u2014 authentication and payments are simulated.",
+      "noAccount": "Need an account? Enter your email to start.",
+      "otpSent": "Verification code sent"
+    },
+    "checkout": {
+      "title": "Confirm your {plan} plan",
+      "subtitle": "Secure checkout \u2014 required to unlock export and filing.",
+      "features": {
+        "access": "Lifetime account access",
+        "storage": "Secure document storage",
+        "guidance": "Basic AI guidance",
+        "priority": "Priority support"
+      },
+      "simulate": "Simulate payment",
+      "pay": "Pay with Stripe",
+      "processing": "Processing...",
+      "back": "Back to export",
+      "maybeLater": "Maybe later",
+      "errors": {
+        "title": "Checkout unavailable",
+        "detail": "Please try again or use demo mode."
+      },
+      "success": {
+        "title": "Plan unlocked",
+        "detail": "You can now export and continue filing."
+      }
+    }
+  }
+}

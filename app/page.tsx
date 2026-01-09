@@ -1,32 +1,29 @@
+import { FAQSection } from "@/components/sections/faq-section";
+import { FeaturesSection } from "@/components/sections/features-section";
+import { FormsSection } from "@/components/sections/forms-section";
+import { HeroSection } from "@/components/sections/hero-section";
+import { HowSection } from "@/components/sections/how-section";
+import { NewsSection } from "@/components/sections/news-section";
+import { PricingSection } from "@/components/sections/pricing-section";
+import { SecuritySection } from "@/components/sections/security-section";
+import { ServeSection } from "@/components/sections/serve-section";
+import { WhySection } from "@/components/sections/why-section";
+import { CTAInline } from "@/components/sections/cta-inline";
 
-'use client';
-
-import { useState } from 'react';
-import Header from '../components/Header';
-import HeroSection from '../components/HeroSection';
-import FeaturesSection from '../components/FeaturesSection';
-import HowItWorksSection from '../components/HowItWorksSection';
-import PricingSection from '../components/PricingSection';
-import ContactSection from '../components/ContactSection';
-import Footer from '../components/Footer';
-import TaxNewsSection from '../components/TaxNewsSection';
-
-export default function Home() {
-  const [currentLanguage, setCurrentLanguage] = useState('en');
-
+export default function HomePage() {
   return (
-    <div className="min-h-screen bg-white">
-      <Header 
-        currentLanguage={currentLanguage} 
-        setCurrentLanguage={setCurrentLanguage} 
-      />
+    <div>
       <HeroSection />
+      <WhySection />
+      <FormsSection />
       <FeaturesSection />
-      <HowItWorksSection />
+      <HowSection />
       <PricingSection />
-      <TaxNewsSection />
-      <ContactSection />
-      <Footer />
+      <SecuritySection />
+      <ServeSection />
+      <NewsSection />
+      <FAQSection />
+      <CTAInline />
     </div>
   );
 }

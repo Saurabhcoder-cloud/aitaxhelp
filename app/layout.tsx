@@ -1,14 +1,22 @@
-
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-import './globals.css';
-import Script from 'next/script';
-
-const inter = Inter({ subsets: ['latin'] });
+import type { Metadata } from "next";
+import "./globals.css";
+import { LocaleProvider } from "@/components/layout/locale-provider";
+import { FooterCTA } from "@/components/layout/footer-cta";
+import { Header } from "@/components/layout/header";
+import { Toaster } from "@/components/ui/toaster";
+import enMessages from "@/lib/messages/en.json";
+import { isStubMode } from "@/lib/env";
 
 export const metadata: Metadata = {
-  title: 'TaxHelp AI - AI-Powered Global Tax Filing Made Simple',
-  description: 'Automate your tax filing with AI. Upload documents, get instant calculations, and file taxes globally with confidence.',
+  title: enMessages.meta.title as string,
+  description: enMessages.meta.description as string,
+  openGraph: {
+    title: enMessages.meta.title as string,
+    description: enMessages.meta.description as string,
+    url: "https://taxhelp.ai",
+    siteName: "TaxHelp AI",
+  },
+  metadataBase: new URL("https://taxhelp.ai"),
 };
 
 export default function RootLayout({
@@ -18,19 +26,21 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
-        {children}
-        <Script 
-          src="https://readdy.ai/api/public/assistant/widget?projectId=f4674a2c-1fdc-4270-9d07-3e67b2f3fd97"
-          strategy="afterInteractive"
-          mode="hybrid"
-          voice-show-transcript="true"
-          theme="light"
-          size="compact"
-          accent-color="#14B8A6"
-          button-base-color="#000000"
-          button-accent-color="#FFFFFF"
-        />
+      <body>
+        <LocaleProvider>
+          <Toaster>
+            <div className="flex min-h-screen flex-col">
+              <Header />
+              {isStubMode() && (
+                <div className="bg-amber-100 px-4 py-2 text-center text-sm text-amber-900">
+                  {enMessages.flow?.auth?.demoBanner as string}
+                </div>
+              )}
+              <main className="flex-1">{children}</main>
+              <FooterCTA />
+            </div>
+          </Toaster>
+        </LocaleProvider>
       </body>
     </html>
   );

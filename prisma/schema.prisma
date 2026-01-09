@@ -1,0 +1,116 @@
+// Prisma schema scaffold for production mode. Install prisma CLI and generate client
+// before running migrations in environments with registry access.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+  sessions  Session[]
+  uploads   Upload[]
+  entitlements Entitlement[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model OtpToken {
+  id        String   @id @default(cuid())
+  email     String
+  tokenHash String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@unique([email])
+}
+
+model Upload {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  filename   String
+  mime       String
+  size       Int
+  status     String
+  storageKey String?
+  year       Int?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  extracted  ExtractedData?
+  audits     AuditEvent[]
+  consent    Consent?
+}
+
+model ExtractedData {
+  id           String   @id @default(cuid())
+  upload       Upload   @relation(fields: [uploadId], references: [id])
+  uploadId     String
+  docType      String
+  extractedJson Json
+  createdAt    DateTime @default(now())
+}
+
+model AuditEvent {
+  id       String   @id @default(cuid())
+  upload   Upload   @relation(fields: [uploadId], references: [id])
+  uploadId String
+  type     String
+  ts       DateTime
+  metaJson Json?
+}
+
+model Consent {
+  id       String   @id @default(cuid())
+  upload   Upload   @relation(fields: [uploadId], references: [id])
+  uploadId String   @unique
+  ts       DateTime
+  locale   String
+  ipHash   String?
+}
+
+model Entitlement {
+  id               String   @id @default(cuid())
+  user             User     @relation(fields: [userId], references: [id])
+  userId           String
+  plan             String
+  status           String
+  source           String
+  stripeSessionId  String?
+  stripeCustomerId String?
+  createdAt        DateTime @default(now())
+}
+
+model Job {
+  id        String   @id @default(cuid())
+  type      String
+  upload    Upload?  @relation(fields: [uploadId], references: [id])
+  uploadId  String?
+  status    String
+  attempts  Int      @default(0)
+  runAt     DateTime
+  lastError String?
+  metaJson  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StripeEvent {
+  id        String   @id
+  createdAt DateTime @default(now())
+}
+
