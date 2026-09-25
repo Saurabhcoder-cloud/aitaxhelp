@@ -1,26 +1,58 @@
 import { GEMINI_CONFIG } from "./config";
 
+type GeminiMockHandler = (
+  systemInstruction: string,
+  userPrompt: string,
+  responseSchema?: Record<string, unknown>
+) => Promise<string> | string;
+
+let activeMockHandler: GeminiMockHandler | null = null;
+
+/**
+ * Test helper to safely mock Gemini responses in automated test suites.
+ * Avoids any live network requests during tests.
+ */
+export function setGeminiMockHandler(handler: GeminiMockHandler | null): void {
+  activeMockHandler = handler;
+}
+
 /**
  * Server-only Gemini API transport client.
  * Calls Google Generative AI REST endpoint directly without bloated third-party SDK dependencies.
+ * Never exposes API keys to client bundles or public endpoints.
  */
 export async function callGeminiApi(
   systemInstruction: string,
   userPrompt: string,
   responseSchema?: Record<string, unknown>
 ): Promise<string> {
-  if (!GEMINI_CONFIG.isConfigured()) {
-    // Graceful fallback for local development without live API keys
-    return JSON.stringify({
-      intent: "ask_question",
-      confidence: 0.95,
-      extractedParameters: {
-        topic: "General Tax Help (API Key Not Configured)",
-      },
-      missingRequiredFields: [],
-    });
+  // 1. Check for active test mock handler first
+  if (activeMockHandler) {
+    return await activeMockHandler(systemInstruction, userPrompt, responseSchema);
   }
 
+  // 2. Offline / Unconfigured Fallback
+  if (!GEMINI_CONFIG.isConfigured()) {
+    if (responseSchema) {
+      return JSON.stringify({
+        intent: "GENERAL_TAX_QUESTION",
+        confidence: 0.9,
+        calculatorType: "income_tax",
+        extractedParameters: {
+          taxYear: 2025,
+          filingStatus: "single",
+        },
+        missingRequiredFields: [],
+      });
+    }
+
+    return (
+      "I am your TaxAIHelp educational assistant. Our deterministic engine computes official IRS progressive tax formulas. " +
+      "You can ask conceptual questions or use our interactive calculators below."
+    );
+  }
+
+  // 3. Live Google Generative AI REST Endpoint
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_CONFIG.modelName}:generateContent?key=${GEMINI_CONFIG.apiKey}`;
 
   const payload: Record<string, unknown> = {

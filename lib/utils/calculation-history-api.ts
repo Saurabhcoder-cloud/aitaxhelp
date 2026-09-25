@@ -8,7 +8,7 @@ export interface HistoryApiResponse<T> {
 
 const DEFAULT_DEV_SESSION_TOKEN = "taxaihelp-local-dev-session-token";
 
-function getClientAuthHeaders(): Record<string, string> {
+export function getClientAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
