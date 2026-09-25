@@ -1,10 +1,23 @@
-import React from "react";
+"use client";
+
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
+import { fetchCalculationHistory } from "@/lib/utils/calculation-history-api";
 
 export default function DashboardOverviewPage() {
+  const [savedCount, setSavedCount] = useState<number>(0);
+
+  useEffect(() => {
+    fetchCalculationHistory().then((res) => {
+      if (res.success && res.data) {
+        setSavedCount(res.data.length);
+      }
+    });
+  }, []);
+
   return (
     <div className="space-y-6">
       {/* Welcome Banner */}
@@ -42,15 +55,17 @@ export default function DashboardOverviewPage() {
           <p className="text-xs text-surface-500 mt-1">IRS IRB 2025-45 / OBBBA verified</p>
         </Card>
 
-        <Card>
-          <span className="text-xs font-semibold text-surface-500 uppercase tracking-wider block">
-            Saved Scenarios
-          </span>
-          <span className="text-3xl font-extrabold text-surface-900 mt-2 block font-mono">
-            0
-          </span>
-          <p className="text-xs text-surface-500 mt-1">Calculations saved to this session</p>
-        </Card>
+        <Link href="/dashboard/calculations" className="block focus:outline-none">
+          <Card className="hover:border-brand-300 transition-colors cursor-pointer">
+            <span className="text-xs font-semibold text-surface-500 uppercase tracking-wider block">
+              Saved Scenarios
+            </span>
+            <span className="text-3xl font-extrabold text-brand-700 mt-2 block font-mono">
+              {savedCount}
+            </span>
+            <p className="text-xs text-brand-600 mt-1 font-medium">View saved calculations →</p>
+          </Card>
+        </Link>
 
         <Card>
           <span className="text-xs font-semibold text-surface-500 uppercase tracking-wider block">

@@ -1,4 +1,6 @@
-import { TaxFilingStatus, TaxYear, TaxCalculationResult } from "./tax";
+import { TaxFilingStatus, TaxYear, TaxCalculationResult, TaxCalculationRecord } from "./tax";
+
+export type { TaxCalculationRecord };
 
 export interface UserProfile {
   id: string;

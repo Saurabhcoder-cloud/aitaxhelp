@@ -131,3 +131,46 @@ export interface TaxCalculationResult {
   // Structured System Warnings & Guardrails
   warnings: TaxWarning[];
 }
+
+// Calculation History & Persistence Record
+export interface TaxCalculationRecord {
+  id: string;
+  userId: string;
+  calculatorType: CalculatorType;
+  taxYear: TaxYear;
+  filingStatus: TaxFilingStatus;
+  title: string;
+  inputSnapshot: Record<string, unknown>;
+  resultSnapshot: TaxCalculationResult;
+  engineVersion: string;
+  rulesVersion: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Request payload to save a calculation
+export interface SaveCalculationRequest {
+  calculatorType: CalculatorType;
+  taxYear: TaxYear;
+  filingStatus: TaxFilingStatus;
+  title?: string;
+  inputSnapshot: Record<string, unknown>;
+  resultSnapshot: TaxCalculationResult;
+}
+
+// Compact summary for calculation history lists
+export interface CalculationHistorySummary {
+  id: string;
+  calculatorType: CalculatorType;
+  taxYear: TaxYear;
+  filingStatus: TaxFilingStatus;
+  title: string;
+  engineVersion: string;
+  rulesVersion: string;
+  createdAt: string;
+  totalTaxLiabilityCents: number;
+  effectiveTaxRate: number;
+  estimatedRefundCents: number;
+  estimatedAmountOwedCents: number;
+}
+

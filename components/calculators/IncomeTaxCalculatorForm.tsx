@@ -1,14 +1,19 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { calculateIncomeTax } from "../../tax-engine";
-import { TaxFilingStatus, TaxYear } from "../../types/tax";
-import { toCents, formatCurrencyFromCents, parseDollarInput } from "../../lib/utils/currency";
-import { Card, CardHeader, CardTitle, CardContent } from "../ui/Card";
-import { FormField } from "../ui/FormField";
-import { Input } from "../ui/Input";
-import { Select } from "../ui/Select";
-import { Badge } from "../ui/Badge";
+import React, { useState, useEffect, useCallback } from "react";
+import { TaxFilingStatus, TaxYear, TaxCalculationResult } from "@/types/tax";
+import { formatCurrencyFromCents } from "@/lib/utils/currency";
+import { validateCurrencyInput } from "@/lib/utils/calculator-validation";
+import { requestTaxCalculation } from "@/lib/utils/calculator-api";
+import { calculateIncomeTax, getTaxRules } from "@/tax-engine";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { FormField } from "@/components/ui/FormField";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Button } from "@/components/ui/Button";
+import { Alert } from "@/components/ui/Alert";
+import { LoadingState } from "@/components/ui/LoadingState";
+import { CalculatorResultPanel } from "./CalculatorResultPanel";
 
 export function IncomeTaxCalculatorForm() {
   const [taxYear, setTaxYear] = useState<TaxYear>(2025);
@@ -17,258 +22,318 @@ export function IncomeTaxCalculatorForm() {
   const [otherIncome, setOtherIncome] = useState<string>("0");
   const [withholding, setWithholding] = useState<string>("8,500");
 
-  // Single source of truth: Invoke deterministic tax engine
-  const result = useMemo(() => {
-    return calculateIncomeTax({
-      taxYear,
-      filingStatus,
-      w2WagesCents: toCents(parseDollarInput(w2Wages)),
-      otherIncomeCents: toCents(parseDollarInput(otherIncome)),
-      federalWithholdingCents: toCents(parseDollarInput(withholding)),
-    });
-  }, [taxYear, filingStatus, w2Wages, otherIncome, withholding]);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [result, setResult] = useState<TaxCalculationResult | null>(null);
+
+  // Standard deduction preview for current inputs
+  const currentStandardDeductionCents = React.useMemo(() => {
+    try {
+      const rules = getTaxRules(taxYear);
+      return rules.standardDeductions[filingStatus] ?? 0;
+    } catch {
+      return 0;
+    }
+  }, [taxYear, filingStatus]);
+
+  // Execute deterministic calculation via application/API boundary
+  const handleCalculate = useCallback(
+    async (overrideInputs?: {
+      year?: TaxYear;
+      status?: TaxFilingStatus;
+      w2?: string;
+      other?: string;
+      withheld?: string;
+    }) => {
+      const activeYear = overrideInputs?.year ?? taxYear;
+      const activeStatus = overrideInputs?.status ?? filingStatus;
+      const activeW2 = overrideInputs?.w2 ?? w2Wages;
+      const activeOther = overrideInputs?.other ?? otherIncome;
+      const activeWithheld = overrideInputs?.withheld ?? withholding;
+
+      // Validate all input fields strictly
+      const errors: Record<string, string> = {};
+
+      const w2Val = validateCurrencyInput(activeW2, {
+        required: true,
+        fieldName: "W-2 Wages",
+      });
+      if (!w2Val.isValid && w2Val.error) {
+        errors.w2Wages = w2Val.error;
+      }
+
+      const otherVal = validateCurrencyInput(activeOther, {
+        required: false,
+        fieldName: "Other Income",
+      });
+      if (!otherVal.isValid && otherVal.error) {
+        errors.otherIncome = otherVal.error;
+      }
+
+      const withVal = validateCurrencyInput(activeWithheld, {
+        required: false,
+        fieldName: "Federal Withholding",
+      });
+      if (!withVal.isValid && withVal.error) {
+        errors.withholding = withVal.error;
+      }
+
+      setFieldErrors(errors);
+
+      if (Object.keys(errors).length > 0) {
+        return;
+      }
+
+      setApiError(null);
+      setIsLoading(true);
+
+      const payload = {
+        taxYear: activeYear,
+        filingStatus: activeStatus,
+        w2WagesCents: w2Val.cents,
+        otherIncomeCents: otherVal.cents,
+        federalWithholdingCents: withVal.cents,
+      };
+
+      try {
+        const response = await requestTaxCalculation("income_tax", payload);
+
+        if (response.success && response.data) {
+          setResult(response.data);
+        } else {
+          // If network API fails in local test/offline mode, fallback safely to local deterministic engine
+          try {
+            const fallbackResult = calculateIncomeTax(payload);
+            setResult(fallbackResult);
+          } catch {
+            setApiError(response.error || "Unable to compute calculation. Please check your inputs.");
+          }
+        }
+      } catch (_err) {
+        // Safe fallback to deterministic tax engine
+        try {
+          const fallbackResult = calculateIncomeTax(payload);
+          setResult(fallbackResult);
+        } catch {
+          setApiError("An unexpected error occurred while calculating taxes. Please try again.");
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [taxYear, filingStatus, w2Wages, otherIncome, withholding]
+  );
+
+  // Initial calculation or restore from saved calculation
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = window.sessionStorage.getItem("taxaihelp_reopen_calculation");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed && (parsed.calculatorType === "income_tax" || parsed.calculatorType === "income")) {
+            const inputs = parsed.inputSnapshot || {};
+            if (inputs.taxYear) setTaxYear(inputs.taxYear);
+            if (inputs.filingStatus) setFilingStatus(inputs.filingStatus);
+            if (inputs.w2WagesCents !== undefined) {
+              setW2Wages((inputs.w2WagesCents / 100).toLocaleString("en-US"));
+            }
+            if (inputs.otherIncomeCents !== undefined) {
+              setOtherIncome((inputs.otherIncomeCents / 100).toLocaleString("en-US"));
+            }
+            if (inputs.federalWithholdingCents !== undefined) {
+              setWithholding((inputs.federalWithholdingCents / 100).toLocaleString("en-US"));
+            }
+            window.sessionStorage.removeItem("taxaihelp_reopen_calculation");
+            // Do not silently recalculate until user clicks Calculate
+            return;
+          }
+        } catch (_err) {
+          // ignore parsing error
+        }
+      }
+    }
+    handleCalculate();
+  }, [handleCalculate]);
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleCalculate();
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
       {/* Form Input Panel */}
       <div className="lg:col-span-5 space-y-6">
-        <Card>
+        <Card className="shadow-card">
           <CardHeader>
             <CardTitle>Taxpayer Inputs</CardTitle>
             <p className="text-xs text-surface-500">
-              Enter your income and filing status for official IRS bracket computation.
+              Enter your income and filing status for official IRS progressive bracket computation.
             </p>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField label="Tax Year" id="taxYear">
-                <Select
-                  id="taxYear"
-                  value={taxYear.toString()}
-                  onChange={(e) => setTaxYear(Number(e.target.value) as TaxYear)}
-                  options={[
-                    { label: "2026 (Rev. Proc. 2025-32)", value: "2026" },
-                    { label: "2025 (IRS IRB 2025-45 / OBBBA)", value: "2025" },
-                    { label: "2024 (Rev. Proc. 2023-34)", value: "2024" },
-                    { label: "2023 (Rev. Proc. 2022-38)", value: "2023" },
-                  ]}
-                />
-              </FormField>
+          <CardContent>
+            <form onSubmit={onSubmit} className="space-y-4" noValidate>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField label="Tax Year" id="taxYear" required>
+                  <Select
+                    id="taxYear"
+                    value={taxYear.toString()}
+                    onChange={(e) => {
+                      const nextYear = Number(e.target.value) as TaxYear;
+                      setTaxYear(nextYear);
+                    }}
+                    options={[
+                      { label: "2026 (Rev. Proc. 2025-32)", value: "2026" },
+                      { label: "2025 (IRS IRB 2025-45 / OBBBA)", value: "2025" },
+                      { label: "2024 (Rev. Proc. 2023-34)", value: "2024" },
+                      { label: "2023 (Rev. Proc. 2022-38)", value: "2023" },
+                    ]}
+                  />
+                </FormField>
 
-              <FormField label="Filing Status" id="filingStatus">
-                <Select
-                  id="filingStatus"
-                  value={filingStatus}
-                  onChange={(e) => setFilingStatus(e.target.value as TaxFilingStatus)}
-                  options={[
-                    { label: "Single", value: "single" },
-                    { label: "Married Joint", value: "married_filing_jointly" },
-                    { label: "Married Separate", value: "married_filing_separately" },
-                    { label: "Head of Household", value: "head_of_household" },
-                    { label: "Qualifying Surviving Spouse", value: "qualifying_surviving_spouse" },
-                  ]}
-                />
-              </FormField>
-            </div>
-
-            <FormField
-              label="W-2 Wages & Salary"
-              id="w2Wages"
-              hint="Box 1 of your Form W-2"
-              required
-            >
-              <Input
-                id="w2Wages"
-                isCurrency
-                value={w2Wages}
-                onChange={(e) => setW2Wages(e.target.value)}
-                placeholder="75,000"
-              />
-            </FormField>
-
-            <FormField
-              label="Other Taxable Ordinary Income"
-              id="otherIncome"
-              hint="Interest, non-qualified dividends, or other taxable income"
-            >
-              <Input
-                id="otherIncome"
-                isCurrency
-                value={otherIncome}
-                onChange={(e) => setOtherIncome(e.target.value)}
-                placeholder="0"
-              />
-            </FormField>
-
-            <FormField
-              label="Federal Income Tax Withheld"
-              id="withholding"
-              hint="Box 2 of your Form W-2"
-            >
-              <Input
-                id="withholding"
-                isCurrency
-                value={withholding}
-                onChange={(e) => setWithholding(e.target.value)}
-                placeholder="0"
-              />
-            </FormField>
-
-            {/* Standard Deduction Transparency Callout */}
-            <div className="rounded-lg bg-surface-50 border border-surface-200 p-3.5 text-xs space-y-1">
-              <div className="flex items-center justify-between text-surface-900 font-semibold">
-                <span>Standard Deduction Applied:</span>
-                <span className="text-emerald-700 font-bold">
-                  {formatCurrencyFromCents(result.deductionUsedCents)}
-                </span>
+                <FormField label="Filing Status" id="filingStatus" required>
+                  <Select
+                    id="filingStatus"
+                    value={filingStatus}
+                    onChange={(e) => {
+                      const nextStatus = e.target.value as TaxFilingStatus;
+                      setFilingStatus(nextStatus);
+                    }}
+                    options={[
+                      { label: "Single", value: "single" },
+                      { label: "Married Filing Jointly", value: "married_filing_jointly" },
+                      { label: "Married Filing Separately", value: "married_filing_separately" },
+                      { label: "Head of Household", value: "head_of_household" },
+                      { label: "Qualifying Surviving Spouse", value: "qualifying_surviving_spouse" },
+                    ]}
+                  />
+                </FormField>
               </div>
-              <p className="text-surface-500 text-[11px] leading-relaxed">
-                Automatically determined by IRS rules for Tax Year {result.taxYear} based on your {filingStatus.replace(/_/g, " ")} status. (Schedule A itemized deductions are not part of this baseline calculation).
-              </p>
-            </div>
+
+              <FormField
+                label="W-2 Wages & Salary"
+                id="w2Wages"
+                hint="Box 1 of your Form W-2"
+                required
+                error={fieldErrors.w2Wages}
+              >
+                <Input
+                  id="w2Wages"
+                  isCurrency
+                  value={w2Wages}
+                  hasError={!!fieldErrors.w2Wages}
+                  onChange={(e) => {
+                    setW2Wages(e.target.value);
+                    if (fieldErrors.w2Wages) {
+                      setFieldErrors((prev) => ({ ...prev, w2Wages: "" }));
+                    }
+                  }}
+                  placeholder="75,000"
+                  aria-invalid={!!fieldErrors.w2Wages}
+                />
+              </FormField>
+
+              <FormField
+                label="Other Taxable Ordinary Income"
+                id="otherIncome"
+                hint="Taxable interest, non-qualified dividends, or other ordinary income"
+                error={fieldErrors.otherIncome}
+              >
+                <Input
+                  id="otherIncome"
+                  isCurrency
+                  value={otherIncome}
+                  hasError={!!fieldErrors.otherIncome}
+                  onChange={(e) => {
+                    setOtherIncome(e.target.value);
+                    if (fieldErrors.otherIncome) {
+                      setFieldErrors((prev) => ({ ...prev, otherIncome: "" }));
+                    }
+                  }}
+                  placeholder="0"
+                  aria-invalid={!!fieldErrors.otherIncome}
+                />
+              </FormField>
+
+              <FormField
+                label="Federal Income Tax Withheld"
+                id="withholding"
+                hint="Box 2 of your Form W-2 (taxes already paid)"
+                error={fieldErrors.withholding}
+              >
+                <Input
+                  id="withholding"
+                  isCurrency
+                  value={withholding}
+                  hasError={!!fieldErrors.withholding}
+                  onChange={(e) => {
+                    setWithholding(e.target.value);
+                    if (fieldErrors.withholding) {
+                      setFieldErrors((prev) => ({ ...prev, withholding: "" }));
+                    }
+                  }}
+                  placeholder="0"
+                  aria-invalid={!!fieldErrors.withholding}
+                />
+              </FormField>
+
+              {/* Standard Deduction Transparency Callout */}
+              <div className="rounded-lg bg-surface-50 border border-surface-200 p-3.5 text-xs space-y-1">
+                <div className="flex items-center justify-between text-surface-900 font-semibold">
+                  <span>Standard Deduction ({taxYear}):</span>
+                  <span className="text-emerald-700 font-bold">
+                    {formatCurrencyFromCents(currentStandardDeductionCents)}
+                  </span>
+                </div>
+                <p className="text-surface-500 text-[11px] leading-relaxed">
+                  Statutory standard deduction for your selected status. Schedule A itemized deductions are not part of this baseline calculation.
+                </p>
+              </div>
+
+              {/* Error Alert if API or Server failed */}
+              {apiError && (
+                <Alert variant="error" title="Calculation Error">
+                  {apiError}
+                </Alert>
+              )}
+
+              {/* Calculation Submit Button */}
+              <div className="pt-2">
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="lg"
+                  className="w-full"
+                  isLoading={isLoading}
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Calculating..." : "Calculate Federal Tax"}
+                </Button>
+              </div>
+            </form>
           </CardContent>
         </Card>
       </div>
 
       {/* Engine Results Panel */}
-      <div className="lg:col-span-7 space-y-6">
-        {/* Primary Outcome Card */}
-        <Card className="border-t-4 border-t-brand-600 bg-gradient-to-br from-white to-surface-50">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-surface-200 pb-4 mb-6 gap-2">
-            <div>
-              <span className="text-xs uppercase font-bold text-surface-500 tracking-wider">
-                Calculation Summary
-              </span>
-              <h2 className="text-xl font-bold text-surface-900">
-                Federal Tax Liability
-              </h2>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="brand">Engine v{result.engineVersion}</Badge>
-              <Badge variant="neutral" className="text-[10px] hidden sm:inline-flex">
-                {result.taxYear} Rules
-              </Badge>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <div className="p-4 rounded-xl bg-white border border-surface-200 shadow-subtle">
-              <span className="text-xs text-surface-500 block">Total Federal Tax</span>
-              <span className="text-2xl font-black text-surface-900 mt-1 block">
-                {formatCurrencyFromCents(result.federalIncomeTaxCents)}
-              </span>
-            </div>
-
-            <div className="p-4 rounded-xl bg-white border border-surface-200 shadow-subtle">
-              <span className="text-xs text-surface-500 block">Effective Tax Rate</span>
-              <span className="text-2xl font-black text-brand-600 mt-1 block">
-                {(result.effectiveTaxRate * 100).toFixed(1)}%
-              </span>
-            </div>
-
-            <div className="p-4 rounded-xl bg-white border border-surface-200 shadow-subtle">
-              <span className="text-xs text-surface-500 block">Marginal Bracket</span>
-              <span className="text-2xl font-black text-surface-900 mt-1 block">
-                {(result.marginalTaxBracket * 100).toFixed(0)}%
-              </span>
-            </div>
-          </div>
-
-          {/* Refund vs Amount Owed */}
-          <div className="p-4 rounded-xl border mb-6 flex items-center justify-between bg-surface-50 border-surface-200">
-            <div>
-              <span className="text-xs font-semibold uppercase text-surface-500">
-                Withholding Balance
-              </span>
-              <h3 className="text-lg font-bold text-surface-900">
-                {result.estimatedRefundCents > 0
-                  ? "Estimated Federal Refund"
-                  : result.estimatedAmountOwedCents > 0
-                  ? "Estimated Balance Due"
-                  : "Tax Liability Balanced"}
-              </h3>
-            </div>
-            <div className="text-right">
-              <span
-                className={`text-2xl font-black ${
-                  result.estimatedRefundCents > 0
-                    ? "text-emerald-600"
-                    : result.estimatedAmountOwedCents > 0
-                    ? "text-amber-600"
-                    : "text-surface-700"
-                }`}
-              >
-                {result.estimatedRefundCents > 0
-                  ? formatCurrencyFromCents(result.estimatedRefundCents)
-                  : result.estimatedAmountOwedCents > 0
-                  ? formatCurrencyFromCents(result.estimatedAmountOwedCents)
-                  : "$0.00"}
-              </span>
-            </div>
-          </div>
-
-          {/* Income & Deduction Waterfall */}
-          <div className="space-y-2 text-sm border-t border-surface-200 pt-4">
-            <div className="flex justify-between py-1 text-surface-600">
-              <span>Gross Income:</span>
-              <span className="font-semibold text-surface-900">
-                {formatCurrencyFromCents(result.grossIncomeCents)}
-              </span>
-            </div>
-            <div className="flex justify-between py-1 text-surface-600">
-              <span>Standard Deduction:</span>
-              <span className="font-semibold text-emerald-600">
-                -{formatCurrencyFromCents(result.deductionUsedCents)}
-              </span>
-            </div>
-            <div className="flex justify-between py-1 text-surface-600 border-t border-surface-100 pt-2 font-medium">
-              <span>Taxable Income:</span>
-              <span className="font-bold text-surface-900">
-                {formatCurrencyFromCents(result.taxableIncomeCents)}
-              </span>
-            </div>
-          </div>
-        </Card>
-
-        {/* Progressive Bracket Breakdown Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Progressive Bracket Breakdown (Tax Year {result.taxYear})</CardTitle>
-            <p className="text-xs text-surface-500">
-              How your taxable income is taxed across each progressive marginal rate tier. Sourced from {result.rulesVersion}.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs sm:text-sm">
-                <thead>
-                  <tr className="border-b border-surface-200 text-surface-500">
-                    <th className="pb-2 font-semibold">Rate</th>
-                    <th className="pb-2 font-semibold">Tax Bracket</th>
-                    <th className="pb-2 font-semibold">Taxable in Tier</th>
-                    <th className="pb-2 font-semibold text-right">Tax Owed</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-surface-100">
-                  {result.bracketBreakdown.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-surface-50/50">
-                      <td className="py-2.5 font-bold text-brand-700">
-                        {(item.rate * 100).toFixed(0)}%
-                      </td>
-                      <td className="py-2.5 text-surface-600">{item.bracketRange}</td>
-                      <td className="py-2.5 text-surface-700">
-                        {formatCurrencyFromCents(item.taxableAmountInBracketCents)}
-                      </td>
-                      <td className="py-2.5 font-semibold text-surface-900 text-right">
-                        {formatCurrencyFromCents(item.taxInBracketCents)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="lg:col-span-7">
+        {isLoading && !result ? (
+          <LoadingState message="Computing verified federal tax liability..." />
+        ) : result ? (
+          <CalculatorResultPanel
+            result={result}
+            inputSnapshot={{
+              taxYear,
+              filingStatus,
+              w2WagesCents: validateCurrencyInput(w2Wages).cents,
+              otherIncomeCents: validateCurrencyInput(otherIncome).cents,
+              federalWithholdingCents: validateCurrencyInput(withholding).cents,
+              itemizedDeductionCents: 0,
+            }}
+          />
+        ) : null}
       </div>
     </div>
   );

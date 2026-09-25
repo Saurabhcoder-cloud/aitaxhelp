@@ -1,15 +1,19 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { calculateSelfEmployedTax } from "../../tax-engine";
-import { TaxFilingStatus, TaxYear } from "../../types/tax";
-import { toCents, formatCurrencyFromCents, parseDollarInput } from "../../lib/utils/currency";
-import { Card, CardHeader, CardTitle, CardContent } from "../ui/Card";
-import { FormField } from "../ui/FormField";
-import { Input } from "../ui/Input";
-import { Select } from "../ui/Select";
-import { Badge } from "../ui/Badge";
-import { Alert } from "../ui/Alert";
+import React, { useState, useEffect, useCallback } from "react";
+import { TaxFilingStatus, TaxYear, TaxCalculationResult } from "@/types/tax";
+import { formatCurrencyFromCents } from "@/lib/utils/currency";
+import { validateCurrencyInput } from "@/lib/utils/calculator-validation";
+import { requestTaxCalculation } from "@/lib/utils/calculator-api";
+import { calculateSelfEmployedTax, getTaxRules } from "@/tax-engine";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { FormField } from "@/components/ui/FormField";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Button } from "@/components/ui/Button";
+import { Alert } from "@/components/ui/Alert";
+import { LoadingState } from "@/components/ui/LoadingState";
+import { CalculatorResultPanel } from "./CalculatorResultPanel";
 
 export function SelfEmployedCalculatorForm() {
   const [taxYear, setTaxYear] = useState<TaxYear>(2025);
@@ -19,231 +23,346 @@ export function SelfEmployedCalculatorForm() {
   const [w2Wages, setW2Wages] = useState<string>("0");
   const [withholding, setWithholding] = useState<string>("0");
 
-  const result = useMemo(() => {
-    return calculateSelfEmployedTax({
-      taxYear,
-      filingStatus,
-      gross1099IncomeCents: toCents(parseDollarInput(grossRevenue)),
-      businessExpensesCents: toCents(parseDollarInput(businessExpenses)),
-      w2WagesCents: toCents(parseDollarInput(w2Wages)),
-      federalWithholdingCents: toCents(parseDollarInput(withholding)),
-    });
-  }, [taxYear, filingStatus, grossRevenue, businessExpenses, w2Wages, withholding]);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [result, setResult] = useState<TaxCalculationResult | null>(null);
 
-  const seDetails = result.selfEmploymentDetails;
+  // Social Security Wage Base Cap display for current tax year
+  const currentSSWageCapCents = React.useMemo(() => {
+    try {
+      const rules = getTaxRules(taxYear);
+      return rules.selfEmployment.socialSecurityWageCapCents;
+    } catch {
+      return 17610000;
+    }
+  }, [taxYear]);
+
+  const handleCalculate = useCallback(
+    async (overrideInputs?: {
+      year?: TaxYear;
+      status?: TaxFilingStatus;
+      revenue?: string;
+      expenses?: string;
+      w2?: string;
+      withheld?: string;
+    }) => {
+      const activeYear = overrideInputs?.year ?? taxYear;
+      const activeStatus = overrideInputs?.status ?? filingStatus;
+      const activeRevenue = overrideInputs?.revenue ?? grossRevenue;
+      const activeExpenses = overrideInputs?.expenses ?? businessExpenses;
+      const activeW2 = overrideInputs?.w2 ?? w2Wages;
+      const activeWithheld = overrideInputs?.withheld ?? withholding;
+
+      const errors: Record<string, string> = {};
+
+      const revenueVal = validateCurrencyInput(activeRevenue, {
+        required: true,
+        fieldName: "Gross Business Revenue",
+      });
+      if (!revenueVal.isValid && revenueVal.error) {
+        errors.grossRevenue = revenueVal.error;
+      }
+
+      const expensesVal = validateCurrencyInput(activeExpenses, {
+        required: false,
+        fieldName: "Business Expenses",
+      });
+      if (!expensesVal.isValid && expensesVal.error) {
+        errors.businessExpenses = expensesVal.error;
+      }
+
+      const w2Val = validateCurrencyInput(activeW2, {
+        required: false,
+        fieldName: "W-2 Wages",
+      });
+      if (!w2Val.isValid && w2Val.error) {
+        errors.w2Wages = w2Val.error;
+      }
+
+      const withVal = validateCurrencyInput(activeWithheld, {
+        required: false,
+        fieldName: "Federal Withholding",
+      });
+      if (!withVal.isValid && withVal.error) {
+        errors.withholding = withVal.error;
+      }
+
+      setFieldErrors(errors);
+
+      if (Object.keys(errors).length > 0) {
+        return;
+      }
+
+      setApiError(null);
+      setIsLoading(true);
+
+      const payload = {
+        taxYear: activeYear,
+        filingStatus: activeStatus,
+        gross1099IncomeCents: revenueVal.cents,
+        businessExpensesCents: expensesVal.cents,
+        w2WagesCents: w2Val.cents,
+        federalWithholdingCents: withVal.cents,
+      };
+
+      try {
+        const response = await requestTaxCalculation("self_employed", payload);
+
+        if (response.success && response.data) {
+          setResult(response.data);
+        } else {
+          try {
+            const fallback = calculateSelfEmployedTax(payload);
+            setResult(fallback);
+          } catch {
+            setApiError(response.error || "Unable to compute calculation. Please check your inputs.");
+          }
+        }
+      } catch (_err) {
+        try {
+          const fallback = calculateSelfEmployedTax(payload);
+          setResult(fallback);
+        } catch {
+          setApiError("An unexpected error occurred while calculating taxes. Please try again.");
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [taxYear, filingStatus, grossRevenue, businessExpenses, w2Wages, withholding]
+  );
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = window.sessionStorage.getItem("taxaihelp_reopen_calculation");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed && (parsed.calculatorType === "self_employed" || parsed.calculatorType === "self-employed")) {
+            const inputs = parsed.inputSnapshot || {};
+            if (inputs.taxYear) setTaxYear(inputs.taxYear);
+            if (inputs.filingStatus) setFilingStatus(inputs.filingStatus);
+            if (inputs.gross1099IncomeCents !== undefined) {
+              setGrossRevenue((inputs.gross1099IncomeCents / 100).toLocaleString("en-US"));
+            }
+            if (inputs.businessExpensesCents !== undefined) {
+              setBusinessExpenses((inputs.businessExpensesCents / 100).toLocaleString("en-US"));
+            }
+            if (inputs.w2WagesCents !== undefined) {
+              setW2Wages((inputs.w2WagesCents / 100).toLocaleString("en-US"));
+            }
+            if (inputs.federalWithholdingCents !== undefined) {
+              setWithholding((inputs.federalWithholdingCents / 100).toLocaleString("en-US"));
+            }
+            window.sessionStorage.removeItem("taxaihelp_reopen_calculation");
+            return;
+          }
+        } catch (_err) {
+          // ignore parsing error
+        }
+      }
+    }
+    handleCalculate();
+  }, [handleCalculate]);
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleCalculate();
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
       {/* Form Input Panel */}
       <div className="lg:col-span-5 space-y-6">
-        <Card>
+        <Card className="shadow-card">
           <CardHeader>
             <CardTitle>Business & Self-Employment Inputs</CardTitle>
             <p className="text-xs text-surface-500">
-              Compute your Schedule SE tax and ordinary income tax liability.
+              Compute your Schedule SE tax (15.3%) and ordinary federal income tax liability.
             </p>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField label="Tax Year" id="seTaxYear">
-                <Select
-                  id="seTaxYear"
-                  value={taxYear.toString()}
-                  onChange={(e) => setTaxYear(Number(e.target.value) as TaxYear)}
-                  options={[
-                    { label: "2026 (Rev. Proc. 2025-32)", value: "2026" },
-                    { label: "2025 (IRS IRB 2025-45 / OBBBA)", value: "2025" },
-                    { label: "2024 (Rev. Proc. 2023-34)", value: "2024" },
-                    { label: "2023 (Rev. Proc. 2022-38)", value: "2023" },
-                  ]}
-                />
-              </FormField>
+          <CardContent>
+            <form onSubmit={onSubmit} className="space-y-4" noValidate>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField label="Tax Year" id="seTaxYear" required>
+                  <Select
+                    id="seTaxYear"
+                    value={taxYear.toString()}
+                    onChange={(e) => {
+                      const nextYear = Number(e.target.value) as TaxYear;
+                      setTaxYear(nextYear);
+                    }}
+                    options={[
+                      { label: "2026 (Rev. Proc. 2025-32)", value: "2026" },
+                      { label: "2025 (IRS IRB 2025-45 / OBBBA)", value: "2025" },
+                      { label: "2024 (Rev. Proc. 2023-34)", value: "2024" },
+                      { label: "2023 (Rev. Proc. 2022-38)", value: "2023" },
+                    ]}
+                  />
+                </FormField>
 
-              <FormField label="Filing Status" id="seFilingStatus">
-                <Select
-                  id="seFilingStatus"
-                  value={filingStatus}
-                  onChange={(e) => setFilingStatus(e.target.value as TaxFilingStatus)}
-                  options={[
-                    { label: "Single", value: "single" },
-                    { label: "Married Joint", value: "married_filing_jointly" },
-                    { label: "Married Separate", value: "married_filing_separately" },
-                    { label: "Head of Household", value: "head_of_household" },
-                  ]}
-                />
-              </FormField>
-            </div>
+                <FormField label="Filing Status" id="seFilingStatus" required>
+                  <Select
+                    id="seFilingStatus"
+                    value={filingStatus}
+                    onChange={(e) => {
+                      const nextStatus = e.target.value as TaxFilingStatus;
+                      setFilingStatus(nextStatus);
+                    }}
+                    options={[
+                      { label: "Single", value: "single" },
+                      { label: "Married Filing Jointly", value: "married_filing_jointly" },
+                      { label: "Married Filing Separately", value: "married_filing_separately" },
+                      { label: "Head of Household", value: "head_of_household" },
+                    ]}
+                  />
+                </FormField>
+              </div>
 
-            <FormField
-              label="Gross Business Revenue / 1099"
-              id="grossRevenue"
-              hint="Total gross receipts before any expenses"
-              required
-            >
-              <Input
+              <FormField
+                label="Gross Business Revenue / 1099"
                 id="grossRevenue"
-                isCurrency
-                value={grossRevenue}
-                onChange={(e) => setGrossRevenue(e.target.value)}
-                placeholder="90,000"
-              />
-            </FormField>
+                hint="Total gross business receipts or 1099 payments before expenses"
+                required
+                error={fieldErrors.grossRevenue}
+              >
+                <Input
+                  id="grossRevenue"
+                  isCurrency
+                  value={grossRevenue}
+                  hasError={!!fieldErrors.grossRevenue}
+                  onChange={(e) => {
+                    setGrossRevenue(e.target.value);
+                    if (fieldErrors.grossRevenue) {
+                      setFieldErrors((prev) => ({ ...prev, grossRevenue: "" }));
+                    }
+                  }}
+                  placeholder="90,000"
+                  aria-invalid={!!fieldErrors.grossRevenue}
+                />
+              </FormField>
 
-            <FormField
-              label="Ordinary Business Expenses"
-              id="businessExpenses"
-              hint="Supplies, software, equipment, home office, travel"
-              required
-            >
-              <Input
+              <FormField
+                label="Ordinary Business Expenses"
                 id="businessExpenses"
-                isCurrency
-                value={businessExpenses}
-                onChange={(e) => setBusinessExpenses(e.target.value)}
-                placeholder="18,000"
-              />
-            </FormField>
+                hint="Supplies, equipment, software, advertising, travel, home office"
+                error={fieldErrors.businessExpenses}
+              >
+                <Input
+                  id="businessExpenses"
+                  isCurrency
+                  value={businessExpenses}
+                  hasError={!!fieldErrors.businessExpenses}
+                  onChange={(e) => {
+                    setBusinessExpenses(e.target.value);
+                    if (fieldErrors.businessExpenses) {
+                      setFieldErrors((prev) => ({ ...prev, businessExpenses: "" }));
+                    }
+                  }}
+                  placeholder="18,000"
+                  aria-invalid={!!fieldErrors.businessExpenses}
+                />
+              </FormField>
 
-            <FormField
-              label="Other W-2 Employment Income (Optional)"
-              id="seW2Wages"
-              hint="If you also have a regular job, affects Social Security wage base cap"
-            >
-              <Input
-                id="seW2Wages"
-                isCurrency
-                value={w2Wages}
-                onChange={(e) => setW2Wages(e.target.value)}
-                placeholder="0"
-              />
-            </FormField>
+              <FormField
+                label="W-2 Wages (If Also Employed)"
+                id="w2Wages"
+                hint="W-2 income reduces your Social Security taxable self-employment wage cap"
+                error={fieldErrors.w2Wages}
+              >
+                <Input
+                  id="w2Wages"
+                  isCurrency
+                  value={w2Wages}
+                  hasError={!!fieldErrors.w2Wages}
+                  onChange={(e) => {
+                    setW2Wages(e.target.value);
+                    if (fieldErrors.w2Wages) {
+                      setFieldErrors((prev) => ({ ...prev, w2Wages: "" }));
+                    }
+                  }}
+                  placeholder="0"
+                  aria-invalid={!!fieldErrors.w2Wages}
+                />
+              </FormField>
 
-            <FormField
-              label="Tax Payments / Withholding Already Paid"
-              id="seWithholding"
-              hint="W-2 withholding or previous estimated quarterly payments"
-            >
-              <Input
-                id="seWithholding"
-                isCurrency
-                value={withholding}
-                onChange={(e) => setWithholding(e.target.value)}
-                placeholder="0"
-              />
-            </FormField>
+              <FormField
+                label="Federal Withholding Already Paid"
+                id="withholding"
+                hint="W-2 withholding or backup withholding already remitted to the IRS"
+                error={fieldErrors.withholding}
+              >
+                <Input
+                  id="withholding"
+                  isCurrency
+                  value={withholding}
+                  hasError={!!fieldErrors.withholding}
+                  onChange={(e) => {
+                    setWithholding(e.target.value);
+                    if (fieldErrors.withholding) {
+                      setFieldErrors((prev) => ({ ...prev, withholding: "" }));
+                    }
+                  }}
+                  placeholder="0"
+                  aria-invalid={!!fieldErrors.withholding}
+                />
+              </FormField>
+
+              {/* Statutory Wage Cap Disclosure */}
+              <div className="rounded-lg bg-surface-50 border border-surface-200 p-3.5 text-xs space-y-1">
+                <div className="flex items-center justify-between text-surface-900 font-semibold">
+                  <span>Social Security Wage Base ({taxYear}):</span>
+                  <span className="text-brand-700 font-bold">
+                    {formatCurrencyFromCents(currentSSWageCapCents)}
+                  </span>
+                </div>
+                <p className="text-surface-500 text-[11px] leading-relaxed">
+                  The 12.4% OASDI portion of self-employment tax is capped at {formatCurrencyFromCents(currentSSWageCapCents)}. Medicare (2.9%) is uncapped.
+                </p>
+              </div>
+
+              {apiError && (
+                <Alert variant="error" title="Calculation Error">
+                  {apiError}
+                </Alert>
+              )}
+
+              <div className="pt-2">
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="lg"
+                  className="w-full"
+                  isLoading={isLoading}
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Calculating..." : "Calculate Self-Employment Tax"}
+                </Button>
+              </div>
+            </form>
           </CardContent>
         </Card>
       </div>
 
-      {/* Results Panel */}
-      <div className="lg:col-span-7 space-y-6">
-        {/* Warnings */}
-        {result.warnings.some((w) => w.code === "BUSINESS_LOSS_DETECTED") && (
-          <Alert variant="warning" title="Net Business Loss Detected">
-            Your deductible business expenses exceed gross revenue. You have no self-employment tax liability, and net losses may offset other eligible income.
-          </Alert>
-        )}
-
-        <Card className="border-t-4 border-t-emerald-600 bg-gradient-to-br from-white to-surface-50">
-          <div className="flex items-center justify-between border-b border-surface-200 pb-4 mb-6">
-            <div>
-              <span className="text-xs uppercase font-bold text-surface-500 tracking-wider">
-                Combined Liability
-              </span>
-              <h2 className="text-xl font-bold text-surface-900">
-                Total Estimated Federal Tax
-              </h2>
-            </div>
-            <Badge variant="emerald">Schedule SE + Income Tax</Badge>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <div className="p-4 rounded-xl bg-white border border-surface-200 shadow-subtle">
-              <span className="text-xs text-surface-500 block">Total Combined Tax</span>
-              <span className="text-2xl font-black text-surface-900 mt-1 block">
-                {formatCurrencyFromCents(result.totalTaxLiabilityCents)}
-              </span>
-            </div>
-
-            <div className="p-4 rounded-xl bg-white border border-surface-200 shadow-subtle">
-              <span className="text-xs text-surface-500 block">Self-Employment Tax</span>
-              <span className="text-2xl font-black text-emerald-600 mt-1 block">
-                {formatCurrencyFromCents(result.selfEmploymentTaxCents)}
-              </span>
-            </div>
-
-            <div className="p-4 rounded-xl bg-white border border-surface-200 shadow-subtle">
-              <span className="text-xs text-surface-500 block">Federal Income Tax</span>
-              <span className="text-2xl font-black text-brand-600 mt-1 block">
-                {formatCurrencyFromCents(result.federalIncomeTaxCents)}
-              </span>
-            </div>
-          </div>
-
-          {/* Schedule SE Breakdown */}
-          {seDetails && (
-            <div className="rounded-xl border border-surface-200 bg-surface-50 p-4 space-y-2.5 text-sm mb-6">
-              <h4 className="font-bold text-surface-900 text-xs uppercase tracking-wider mb-2">
-                Schedule SE Tax Breakdown
-              </h4>
-              <div className="flex justify-between text-surface-600">
-                <span>Net Business Profit:</span>
-                <span className="font-semibold text-surface-900">
-                  {formatCurrencyFromCents(seDetails.netSelfEmploymentProfitCents)}
-                </span>
-              </div>
-              <div className="flex justify-between text-surface-600">
-                <span>Taxable SE Profit (92.35% Statutory Factor):</span>
-                <span className="font-semibold text-surface-900">
-                  {formatCurrencyFromCents(seDetails.taxableSelfEmploymentProfitCents)}
-                </span>
-              </div>
-              <div className="flex justify-between text-surface-600">
-                <span>Social Security Tax (12.4%):</span>
-                <span className="font-semibold text-surface-900">
-                  {formatCurrencyFromCents(seDetails.socialSecurityTaxCents)}
-                </span>
-              </div>
-              <div className="flex justify-between text-surface-600">
-                <span>Medicare Tax (2.9%):</span>
-                <span className="font-semibold text-surface-900">
-                  {formatCurrencyFromCents(seDetails.medicareTaxCents)}
-                </span>
-              </div>
-              <div className="flex justify-between text-surface-700 border-t border-surface-200 pt-2 font-medium">
-                <span>Deductible Half of SE Tax (reduces AGI):</span>
-                <span className="font-bold text-emerald-700">
-                  -{formatCurrencyFromCents(seDetails.deductibleHalfCents)}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Balance Position */}
-          <div className="p-4 rounded-xl border flex items-center justify-between bg-white border-surface-200">
-            <div>
-              <span className="text-xs font-semibold uppercase text-surface-500">
-                Estimated Net Position
-              </span>
-              <h3 className="text-lg font-bold text-surface-900">
-                {result.estimatedAmountOwedCents > 0
-                  ? "Estimated Balance Due"
-                  : result.estimatedRefundCents > 0
-                  ? "Estimated Overpayment / Refund"
-                  : "Balanced"}
-              </h3>
-            </div>
-            <div className="text-right">
-              <span className="text-2xl font-black text-surface-900">
-                {result.estimatedAmountOwedCents > 0
-                  ? formatCurrencyFromCents(result.estimatedAmountOwedCents)
-                  : result.estimatedRefundCents > 0
-                  ? formatCurrencyFromCents(result.estimatedRefundCents)
-                  : "$0.00"}
-              </span>
-            </div>
-          </div>
-        </Card>
+      {/* Engine Results Panel */}
+      <div className="lg:col-span-7">
+        {isLoading && !result ? (
+          <LoadingState message="Computing Schedule SE and federal liabilities..." />
+        ) : result ? (
+          <CalculatorResultPanel
+            result={result}
+            inputSnapshot={{
+              taxYear,
+              filingStatus,
+              gross1099IncomeCents: validateCurrencyInput(grossRevenue).cents,
+              businessExpensesCents: validateCurrencyInput(businessExpenses).cents,
+              w2WagesCents: validateCurrencyInput(w2Wages).cents,
+              federalWithholdingCents: validateCurrencyInput(withholding).cents,
+              hasOtherSelfEmploymentIncome: false,
+            }}
+          />
+        ) : null}
       </div>
     </div>
   );
