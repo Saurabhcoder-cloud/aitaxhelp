@@ -40,21 +40,21 @@ export async function POST(req: NextRequest) {
 
     switch (validated.calculatorType) {
       case "income_tax": {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { calculatorType: _ct, ...input } = validated;
+        const { calculatorType, ...input } = validated;
+        void calculatorType;
         result = calculateIncomeTax(input);
         break;
       }
       case "self_employed":
       case "1099": {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { calculatorType: _ct, ...input } = validated;
+        const { calculatorType, ...input } = validated;
+        void calculatorType;
         result = calculateSelfEmployedTax(input);
         break;
       }
       case "quarterly_tax": {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { calculatorType: _ct, ...input } = validated;
+        const { calculatorType, ...input } = validated;
+        void calculatorType;
         result = calculateQuarterlyTax(input);
         break;
       }
