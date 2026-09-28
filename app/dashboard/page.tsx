@@ -160,7 +160,10 @@ export default function DashboardOverviewPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2.5 sm:gap-3 shrink-0">
-          <Button href="/tax-calculators" size="sm" className="bg-white text-navy-950 hover:bg-surface-100 font-semibold shadow-sm">
+          <Button href="/dashboard/taxes" size="sm" className="bg-white text-navy-950 hover:bg-surface-100 font-semibold shadow-sm">
+            Start My Taxes
+          </Button>
+          <Button href="/tax-calculators" size="sm" variant="outline" className="border-surface-600 text-white hover:bg-navy-800">
             Run Calculation
           </Button>
           <Button href="/ai-tax-assistant" variant="outline" size="sm" className="border-surface-600 text-white hover:bg-navy-800">

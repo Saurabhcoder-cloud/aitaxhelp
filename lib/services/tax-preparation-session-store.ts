@@ -1,0 +1,546 @@
+import { TaxYear } from "@/types/tax";
+import { SUPABASE_CONFIG } from "@/lib/supabase/config";
+import { getServerSupabaseClient } from "@/lib/supabase/server";
+import { UserProfileStore } from "@/lib/services/user-profile-store";
+import { AppError } from "@/lib/utils/errors";
+import { suggestPreparationCalculators, PreparationCalculatorLink } from "@/lib/preparation/calculators";
+import { emptyIncomeDiscovery, IncomeDiscovery, suggestCalculatorsForIncome } from "@/lib/preparation/income";
+import { incomeDiscoverySchema, isCompleteIncomeDiscovery } from "@/lib/validations/preparation-income";
+import {
+  DocumentsSnapshot,
+  emptyDocumentsSnapshot,
+  stampDocuments,
+} from "@/lib/preparation/documents";
+import { DeductionDiscovery, emptyDeductionDiscovery } from "@/lib/preparation/deductions";
+import { documentsInputSchema, DocumentsInput } from "@/lib/validations/preparation-documents";
+import { deductionDiscoveryInputSchema } from "@/lib/validations/preparation-deductions";
+import { isCompleteDeductionDiscovery } from "@/lib/validations/preparation-deductions";
+import {
+  assessCalculationReadiness,
+  buildTaxSituationSummary,
+  CalculationReadiness,
+  TaxSituationSummary,
+} from "@/lib/preparation/situation-summary";
+import {
+  PREPARATION_STEPS,
+  PreparationProfileSnapshot,
+  PreparationStatus,
+  PreparationStep,
+  PreparationStepMap,
+  completeCurrentStep,
+  emptyStepMap,
+} from "@/lib/preparation/steps";
+
+export interface TaxPreparationSession {
+  id: string;
+  userId: string;
+  taxProfileId: string;
+  taxYear: TaxYear;
+  title: string;
+  status: PreparationStatus;
+  currentStep: PreparationStep;
+  steps: PreparationStepMap;
+  profileSnapshot: PreparationProfileSnapshot;
+  incomeSnapshot: IncomeDiscovery;
+  documentsSnapshot: DocumentsSnapshot;
+  deductionsSnapshot: DeductionDiscovery;
+  situationSummary: TaxSituationSummary;
+  calculationReadiness: CalculationReadiness;
+  suggestedCalculators: PreparationCalculatorLink[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface PreparationSessionRow {
+  id: string;
+  user_id: string;
+  tax_profile_id: string | null;
+  tax_year: number;
+  title: string;
+  status: PreparationStatus;
+  current_step: PreparationStep;
+  steps: PreparationStepMap;
+  profile_snapshot: PreparationProfileSnapshot;
+  income_snapshot?: IncomeDiscovery | null;
+  documents_snapshot?: DocumentsSnapshot | null;
+  deductions_snapshot?: DeductionDiscovery | null;
+  created_at: string;
+  updated_at: string;
+}
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __taxPreparationSessionStore: Map<string, TaxPreparationSession> | undefined;
+}
+
+function getMemoryStore(): Map<string, TaxPreparationSession> {
+  if (!globalThis.__taxPreparationSessionStore) {
+    globalThis.__taxPreparationSessionStore = new Map<string, TaxPreparationSession>();
+  }
+  return globalThis.__taxPreparationSessionStore;
+}
+
+function readIncome(value: unknown): IncomeDiscovery {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return emptyIncomeDiscovery();
+  }
+  const record = value as Partial<IncomeDiscovery>;
+  if (!Array.isArray(record.situations)) {
+    return emptyIncomeDiscovery();
+  }
+  return {
+    situations: record.situations,
+    w2s: Array.isArray(record.w2s) ? record.w2s : [],
+    form1099s: Array.isArray(record.form1099s) ? record.form1099s : [],
+    activities: Array.isArray(record.activities) ? record.activities : [],
+  };
+}
+
+function readDocuments(value: unknown): DocumentsSnapshot {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return emptyDocumentsSnapshot();
+  }
+  const record = value as Partial<DocumentsSnapshot>;
+  return {
+    documents: Array.isArray(record.documents) ? record.documents : [],
+  };
+}
+
+function readDeductions(value: unknown): DeductionDiscovery {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return emptyDeductionDiscovery();
+  }
+  const record = value as Partial<DeductionDiscovery>;
+  return {
+    saved: Boolean(record.saved),
+    hasBusinessExpenses:
+      record.hasBusinessExpenses === true || record.hasBusinessExpenses === false
+        ? record.hasBusinessExpenses
+        : null,
+    standardDeductionAcknowledged: Boolean(record.standardDeductionAcknowledged),
+    entries: Array.isArray(record.entries) ? record.entries : [],
+  };
+}
+
+function toPublic(record: TaxPreparationSession): TaxPreparationSession {
+  const incomeSnapshot = readIncome(record.incomeSnapshot);
+  const documentsSnapshot = readDocuments(record.documentsSnapshot);
+  const deductionsSnapshot = readDeductions(record.deductionsSnapshot);
+  const summaryInput = {
+    taxYear: record.taxYear,
+    profile: record.profileSnapshot,
+    steps: record.steps,
+    currentStep: record.currentStep,
+    income: incomeSnapshot,
+    documents: documentsSnapshot,
+    deductions: deductionsSnapshot,
+  };
+  return {
+    ...record,
+    incomeSnapshot,
+    documentsSnapshot,
+    deductionsSnapshot,
+    situationSummary: buildTaxSituationSummary(summaryInput),
+    calculationReadiness: assessCalculationReadiness(summaryInput),
+    suggestedCalculators:
+      incomeSnapshot.situations.length > 0
+        ? suggestCalculatorsForIncome(incomeSnapshot)
+        : suggestPreparationCalculators(record.profileSnapshot),
+  };
+}
+
+function fromRow(row: PreparationSessionRow): TaxPreparationSession {
+  return toPublic({
+    id: row.id,
+    userId: row.user_id,
+    taxProfileId: row.tax_profile_id || "",
+    taxYear: row.tax_year as TaxYear,
+    title: row.title,
+    status: row.status,
+    currentStep: row.current_step,
+    steps: row.steps,
+    profileSnapshot: row.profile_snapshot,
+    incomeSnapshot: readIncome(row.income_snapshot),
+    documentsSnapshot: readDocuments(row.documents_snapshot),
+    deductionsSnapshot: readDeductions(row.deductions_snapshot),
+    situationSummary: undefined as unknown as TaxSituationSummary,
+    calculationReadiness: undefined as unknown as CalculationReadiness,
+    suggestedCalculators: [],
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  });
+}
+
+function isOpen(session: TaxPreparationSession): boolean {
+  return session.status !== "completed";
+}
+
+export class TaxPreparationSessionStore {
+  /**
+   * Returns the caller's open preparation session, if one exists.
+   * SECURITY: keyed only by the verified server user id.
+   */
+  public static async getCurrent(userId: string): Promise<TaxPreparationSession | null> {
+    if (SUPABASE_CONFIG.isConfigured()) {
+      const row = await this.selectOpenFromDatabase(userId);
+      return row ? fromRow(row) : null;
+    }
+
+    const open = Array.from(getMemoryStore().values())
+      .filter((session) => session.userId === userId && isOpen(session))
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    return open[0] ? toPublic(open[0]) : null;
+  }
+
+  /**
+   * Starts a preparation session or resumes the existing open one.
+   */
+  public static async start(
+    userId: string,
+    email?: string
+  ): Promise<{ session: TaxPreparationSession; created: boolean }> {
+    const existing = await this.getCurrent(userId);
+    if (existing) {
+      return { session: existing, created: false };
+    }
+
+    const [profile, taxProfile] = await Promise.all([
+      UserProfileStore.getProfile(userId, email),
+      UserProfileStore.getTaxProfile(userId),
+    ]);
+
+    const profileReused = Boolean(profile.fullName && profile.fullName.trim().length > 0);
+    const currentStep: PreparationStep = profileReused ? "income" : "taxpayer_profile";
+    const steps = emptyStepMap(currentStep);
+    if (profileReused) {
+      steps.taxpayer_profile = "completed";
+    }
+
+    const now = new Date().toISOString();
+    const snapshot: PreparationProfileSnapshot = {
+      fullName: profile.fullName,
+      filingStatus: taxProfile.filingStatus,
+      taxYear: taxProfile.defaultTaxYear,
+      hasW2Income: taxProfile.hasW2Income,
+      has1099Income: taxProfile.has1099Income,
+      hasBusinessExpenses: taxProfile.hasBusinessExpenses,
+      stateOfResidence: taxProfile.stateOfResidence,
+      profileReused,
+    };
+
+    const record: TaxPreparationSession = {
+      id: crypto.randomUUID(),
+      userId,
+      taxProfileId: taxProfile.id,
+      taxYear: taxProfile.defaultTaxYear,
+      title: `${taxProfile.defaultTaxYear} Tax Preparation`,
+      status: profileReused ? "in_progress" : "draft",
+      currentStep,
+      steps,
+      profileSnapshot: snapshot,
+      incomeSnapshot: emptyIncomeDiscovery(),
+      documentsSnapshot: emptyDocumentsSnapshot(),
+      deductionsSnapshot: emptyDeductionDiscovery(),
+      situationSummary: undefined as unknown as TaxSituationSummary,
+      calculationReadiness: undefined as unknown as CalculationReadiness,
+      suggestedCalculators: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    if (SUPABASE_CONFIG.isConfigured()) {
+      const saved = await this.insertDatabase(record);
+      return { session: fromRow(saved), created: true };
+    }
+
+    getMemoryStore().set(record.id, record);
+    return { session: toPublic(record), created: true };
+  }
+
+  /**
+   * Marks the current step complete and advances the session.
+   * Rejects attempts to complete a step the caller has not reached.
+   */
+  public static async updateProgress(
+    userId: string,
+    completeStep: PreparationStep
+  ): Promise<TaxPreparationSession> {
+    const current = await this.getCurrent(userId);
+    if (!current) {
+      throw new AppError("No open tax preparation session.", 404, "NOT_FOUND");
+    }
+    if (!PREPARATION_STEPS.includes(completeStep)) {
+      throw new AppError("Unknown preparation step.", 422, "VALIDATION_ERROR");
+    }
+    if (current.currentStep !== completeStep) {
+      throw new AppError(
+        "Only the current preparation step can be completed.",
+        409,
+        "INVALID_STEP"
+      );
+    }
+    if (completeStep === "income" && !isCompleteIncomeDiscovery(current.incomeSnapshot)) {
+      throw new AppError(
+        "Finish income discovery before continuing.",
+        422,
+        "VALIDATION_ERROR"
+      );
+    }
+    if (completeStep === "deductions") {
+      const deductionCheck = isCompleteDeductionDiscovery(current.deductionsSnapshot, current.incomeSnapshot);
+      if (!deductionCheck.success) {
+        throw new AppError(deductionCheck.message, 422, "VALIDATION_ERROR");
+      }
+    }
+
+    const advanced = completeCurrentStep(current.steps, current.currentStep);
+    const updated: TaxPreparationSession = {
+      ...current,
+      status: advanced.status,
+      currentStep: advanced.currentStep,
+      steps: advanced.steps,
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (SUPABASE_CONFIG.isConfigured()) {
+      const saved = await this.updateDatabase(updated);
+      return fromRow(saved);
+    }
+
+    getMemoryStore().set(updated.id, updated);
+    return toPublic(updated);
+  }
+
+  /**
+   * Saves the authenticated user's income discovery answers on the open session.
+   * SECURITY: userId is the verified server user, never a client-supplied id.
+   */
+  public static async saveIncome(
+    userId: string,
+    income: IncomeDiscovery
+  ): Promise<TaxPreparationSession> {
+    const parsed = incomeDiscoverySchema.parse(income);
+    const current = await this.getCurrent(userId);
+    if (!current) {
+      throw new AppError("No open tax preparation session.", 404, "NOT_FOUND");
+    }
+
+    const updated: TaxPreparationSession = {
+      ...current,
+      incomeSnapshot: parsed,
+      profileSnapshot: {
+        ...current.profileSnapshot,
+        hasW2Income: parsed.situations.includes("employer"),
+        has1099Income:
+          parsed.situations.includes("freelance") || parsed.situations.includes("gig"),
+        hasBusinessExpenses: parsed.situations.includes("business") || parsed.situations.includes("gig"),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (SUPABASE_CONFIG.isConfigured()) {
+      const saved = await this.updateDatabase(updated);
+      return fromRow(saved);
+    }
+
+    getMemoryStore().set(updated.id, updated);
+    return toPublic(updated);
+  }
+
+  /**
+   * Replaces document metadata on the open session.
+   * SECURITY: userId and session id are stamped from the authenticated session.
+   * File contents are never stored.
+   */
+  public static async saveDocuments(
+    userId: string,
+    input: DocumentsInput
+  ): Promise<TaxPreparationSession> {
+    const parsed = documentsInputSchema.parse(input);
+    const current = await this.getCurrent(userId);
+    if (!current) {
+      throw new AppError("No open tax preparation session.", 404, "NOT_FOUND");
+    }
+    for (const document of parsed.documents) {
+      if (document.taxYear !== current.taxYear) {
+        throw new AppError("Document tax year must match the preparation session.", 422, "VALIDATION_ERROR");
+      }
+    }
+
+    const now = new Date().toISOString();
+    const updated: TaxPreparationSession = {
+      ...current,
+      documentsSnapshot: {
+        documents: stampDocuments(
+          parsed.documents,
+          current.id,
+          current.userId,
+          current.documentsSnapshot.documents,
+          now
+        ),
+      },
+      updatedAt: now,
+    };
+
+    return this.persist(updated);
+  }
+
+  /**
+   * Saves deduction discovery answers. Amounts are stored only.
+   * The tax engine remains the only calculator.
+   */
+  public static async saveDeductions(
+    userId: string,
+    input: Omit<DeductionDiscovery, "saved">
+  ): Promise<TaxPreparationSession> {
+    const parsed = deductionDiscoveryInputSchema.parse(input);
+    const current = await this.getCurrent(userId);
+    if (!current) {
+      throw new AppError("No open tax preparation session.", 404, "NOT_FOUND");
+    }
+
+    const discovery: DeductionDiscovery = {
+      saved: true,
+      hasBusinessExpenses: parsed.hasBusinessExpenses,
+      standardDeductionAcknowledged: parsed.standardDeductionAcknowledged,
+      entries: parsed.entries,
+    };
+    const check = isCompleteDeductionDiscovery(discovery, current.incomeSnapshot);
+    if (!check.success) {
+      throw new AppError(check.message, 422, "VALIDATION_ERROR");
+    }
+
+    const updated: TaxPreparationSession = {
+      ...current,
+      deductionsSnapshot: discovery,
+      profileSnapshot: {
+        ...current.profileSnapshot,
+        hasBusinessExpenses: Boolean(parsed.hasBusinessExpenses),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    return this.persist(updated);
+  }
+
+  private static async persist(updated: TaxPreparationSession): Promise<TaxPreparationSession> {
+    if (SUPABASE_CONFIG.isConfigured()) {
+      const saved = await this.updateDatabase(updated);
+      return fromRow(saved);
+    }
+    getMemoryStore().set(updated.id, updated);
+    return toPublic(updated);
+  }
+
+  public static clear(): void {
+    getMemoryStore().clear();
+  }
+
+  private static async selectOpenFromDatabase(userId: string): Promise<PreparationSessionRow | null> {
+    const supabase = getServerSupabaseClient() as unknown as {
+      from: (table: string) => {
+        select: (cols: string) => {
+          eq: (col: string, val: string) => {
+            neq: (col: string, val: string) => {
+              order: (col: string, opts: { ascending: boolean }) => {
+                limit: (n: number) => {
+                  maybeSingle: () => Promise<{ data: PreparationSessionRow | null; error: { message: string } | null }>;
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+
+    const { data, error } = await supabase
+      .from("tax_preparation_sessions")
+      .select("*")
+      .eq("user_id", userId)
+      .neq("status", "completed")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throw new AppError("Unable to load the preparation session.", 500, "PREPARATION_STORE_ERROR");
+    }
+    return data;
+  }
+
+  private static async insertDatabase(record: TaxPreparationSession): Promise<PreparationSessionRow> {
+    const supabase = getServerSupabaseClient() as unknown as {
+      from: (table: string) => {
+        insert: (values: unknown) => {
+          select: () => {
+            single: () => Promise<{ data: PreparationSessionRow | null; error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+
+    const { data, error } = await supabase
+      .from("tax_preparation_sessions")
+      .insert({
+        id: record.id,
+        user_id: record.userId,
+        tax_profile_id: record.taxProfileId,
+        tax_year: record.taxYear,
+        title: record.title,
+        status: record.status,
+        current_step: record.currentStep,
+        steps: record.steps,
+        profile_snapshot: record.profileSnapshot,
+        income_snapshot: record.incomeSnapshot,
+        documents_snapshot: record.documentsSnapshot,
+        deductions_snapshot: record.deductionsSnapshot,
+        created_at: record.createdAt,
+        updated_at: record.updatedAt,
+      })
+      .select()
+      .single();
+
+    if (error || !data) {
+      throw new AppError("Unable to start the preparation session.", 500, "PREPARATION_STORE_ERROR");
+    }
+    return data;
+  }
+
+  private static async updateDatabase(record: TaxPreparationSession): Promise<PreparationSessionRow> {
+    const supabase = getServerSupabaseClient() as unknown as {
+      from: (table: string) => {
+        update: (values: unknown) => {
+          eq: (col: string, val: string) => {
+            eq: (col: string, val: string) => {
+              select: () => {
+                single: () => Promise<{ data: PreparationSessionRow | null; error: { message: string } | null }>;
+              };
+            };
+          };
+        };
+      };
+    };
+
+    const { data, error } = await supabase
+      .from("tax_preparation_sessions")
+      .update({
+        status: record.status,
+        current_step: record.currentStep,
+        steps: record.steps,
+        profile_snapshot: record.profileSnapshot,
+        income_snapshot: record.incomeSnapshot,
+        documents_snapshot: record.documentsSnapshot,
+        deductions_snapshot: record.deductionsSnapshot,
+        updated_at: record.updatedAt,
+      })
+      .eq("id", record.id)
+      .eq("user_id", record.userId)
+      .select()
+      .single();
+
+    if (error || !data) {
+      throw new AppError("Unable to update the preparation session.", 500, "PREPARATION_STORE_ERROR");
+    }
+    return data;
+  }
+}

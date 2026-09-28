@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "../../lib/utils/cn";
 import { signOut, checkSession, getSessionToken } from "@/lib/utils/auth-client";
-import { LogOut, User, Sparkles, Calculator, LayoutDashboard, Shield, CreditCard, Bell, LifeBuoy } from "lucide-react";
+import { LogOut, User, Sparkles, Calculator, LayoutDashboard, Shield, CreditCard, Bell, LifeBuoy, ClipboardList } from "lucide-react";
 
 export function DashboardNav() {
   const pathname = usePathname();
@@ -37,6 +37,7 @@ export function DashboardNav() {
 
   const links = [
     { title: "Overview", href: "/dashboard", icon: LayoutDashboard },
+    { title: "My Taxes", href: "/dashboard/taxes", icon: ClipboardList },
     { title: "Saved Calculations", href: "/dashboard/calculations", icon: Calculator },
     { title: "AI Conversations", href: "/dashboard/conversations", icon: Sparkles },
     { title: "Notifications", href: "/dashboard/notifications", icon: Bell, badge: unreadCount },
