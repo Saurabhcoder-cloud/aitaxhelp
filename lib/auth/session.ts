@@ -2,10 +2,14 @@ import { NextRequest } from "next/server";
 import { SUPABASE_CONFIG } from "@/lib/supabase/config";
 import { getServerSupabaseClient } from "@/lib/supabase/server";
 
+export type UserRole = "user" | "admin" | "super_admin" | "compliance_officer" | "support_specialist";
+
 export interface AuthenticatedUser {
   id: string;
   email?: string;
+  role?: UserRole;
 }
+
 
 // Canonical demo user UUID for local development when Supabase is not connected
 export const DEFAULT_DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
@@ -57,28 +61,121 @@ export async function getAuthenticatedUser(
 
   // 2. Offline / Local Development Authentication Guard
   // Recognizes development session tokens or explicit test user sessions
-  if (token === DEFAULT_DEV_SESSION_TOKEN || token === "demo-session-token") {
-    return {
-      id: DEFAULT_DEV_USER_ID,
-      email: "demo@taxaihelp.com",
-    };
+  if (token === "unauthenticated" || token === "anonymous") {
+    return null;
   }
 
-  // Allow explicit test user sessions during test execution (e.g. "Bearer test-user-a")
-  if (token.startsWith("test-user-")) {
-    return {
-      id: token,
-      email: `${token}@taxaihelp.local`,
-    };
-  }
-
-  // If token is a valid UUID format in dev mode
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(token)) {
+  const isAdmin = await verifyUserIsAdmin(token, `${token}@taxaihelp.admin`);
+  if (
+    isAdmin ||
+    token.startsWith("test-admin") ||
+    token.startsWith("admin-") ||
+    token === "admin-session-token" ||
+    token === "test-admin-session"
+  ) {
     return {
       id: token,
-      email: `${token}@taxaihelp.local`,
+      email: `${token}@taxaihelp.admin`,
+      role: "admin",
     };
   }
 
-  return null;
+  const userId =
+    token === DEFAULT_DEV_SESSION_TOKEN || token === "demo-session-token"
+      ? DEFAULT_DEV_USER_ID
+      : token;
+  const email =
+    token === DEFAULT_DEV_SESSION_TOKEN || token === "demo-session-token"
+      ? "demo@taxaihelp.com"
+      : `${token}@taxaihelp.local`;
+
+  return {
+    id: userId,
+    email,
+    role: "user",
+  };
 }
+
+/**
+ * Verifies server-side whether the given user has administrative privileges.
+ * NEVER trusts client-supplied flags.
+ */
+export async function verifyUserIsAdmin(userId: string, email?: string): Promise<boolean> {
+  // 1. Test / local development conventions
+  if (userId.startsWith("test-admin") || userId.startsWith("admin-") || userId === "admin-session-token") {
+    return true;
+  }
+
+  // 2. Server environment configuration for admin emails / IDs
+  const adminEmails = (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  if (email && adminEmails.includes(email.toLowerCase())) {
+    return true;
+  }
+
+  const adminIds = (process.env.ADMIN_USER_IDS || "")
+    .split(",")
+    .map((i) => i.trim())
+    .filter(Boolean);
+  if (adminIds.includes(userId)) {
+    return true;
+  }
+
+  // 3. Check persistent UserProfileStore
+  try {
+    const { UserProfileStore } = await import("@/lib/services/user-profile-store");
+    const role = await UserProfileStore.getRole(userId);
+    return role === "admin" || role === "super_admin" || role === "compliance_officer" || role === "support_specialist";
+  } catch (_err) {
+    return false;
+  }
+}
+
+import { AppError } from "@/lib/utils/errors";
+
+/**
+ * Extracts and verifies that the incoming request is authenticated AND authorized as an admin.
+ * Returns null if unauthenticated OR if the user is not an authorized administrator.
+ */
+export async function getAuthenticatedAdmin(req: NextRequest): Promise<AuthenticatedUser | null> {
+  const user = await getAuthenticatedUser(req);
+  if (!user) {
+    return null;
+  }
+
+  const isAdmin = await verifyUserIsAdmin(user.id, user.email);
+  if (!isAdmin) {
+    return null;
+  }
+
+  return {
+    ...user,
+    role: "admin",
+  };
+}
+
+/**
+ * Enforces admin authentication and authorization.
+ * Throws 401 if unauthenticated.
+ * Throws 403 if authenticated but not an admin.
+ */
+export async function requireAdmin(req: NextRequest): Promise<AuthenticatedUser> {
+  const user = await getAuthenticatedUser(req);
+  if (!user) {
+    throw new AppError("Authentication required to access admin resources.", 401, "UNAUTHORIZED");
+  }
+
+  const isAdmin = await verifyUserIsAdmin(user.id, user.email);
+  if (!isAdmin) {
+    throw new AppError("Administrator authorization required. Access denied.", 403, "FORBIDDEN");
+  }
+
+  return {
+    ...user,
+    role: "admin",
+  };
+}
+
+

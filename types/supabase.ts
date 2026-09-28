@@ -2,13 +2,24 @@ import { TaxFilingStatus, TaxYear, TaxCalculationResult, TaxCalculationRecord } 
 
 export type { TaxCalculationRecord };
 
+export type UserRole = "user" | "admin" | "super_admin" | "compliance_officer" | "support_specialist";
+
+export interface LeadInternalNote {
+  id: string;
+  adminUserId: string;
+  note: string;
+  createdAt: string;
+}
+
 export interface UserProfile {
   id: string;
   email: string;
   fullName: string | null;
+  role?: UserRole;
   createdAt: string;
   updatedAt: string;
 }
+
 
 export interface TaxProfile {
   id: string;
@@ -58,6 +69,8 @@ export interface TaxProfessionalLead {
   urgency: "immediate" | "this_month" | "planning_ahead";
   estimatedAnnualIncomeRange: string;
   notes?: string;
+  internalNotes?: LeadInternalNote[];
   status: "new" | "contacted" | "matched" | "archived";
   createdAt: string;
 }
+

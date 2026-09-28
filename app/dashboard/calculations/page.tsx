@@ -18,6 +18,8 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { Alert } from "@/components/ui/Alert";
+import { Sparkles, Scale } from "lucide-react";
+
 
 function getCalculatorTypeLabel(type: CalculatorType): string {
   switch (type) {
@@ -64,6 +66,22 @@ export default function DashboardCalculationsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Scenario comparison selection state
+  const [selectedForCompare, setSelectedForCompare] = useState<string[]>([]);
+
+  const toggleCompareSelect = (id: string) => {
+    setSelectedForCompare((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((item) => item !== id);
+      }
+      if (prev.length >= 2) {
+        return [prev[1], id];
+      }
+      return [...prev, id];
+    });
+  };
+
 
   const loadCalculations = useCallback(async () => {
     setIsLoading(true);
@@ -144,6 +162,10 @@ export default function DashboardCalculationsPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Button href="/dashboard/calculations/compare" size="sm" variant="outline" className="gap-1.5">
+            <Scale className="w-3.5 h-3.5 text-brand-600" />
+            Compare Scenarios
+          </Button>
           <Button href="/tax-calculators" size="sm" variant="primary">
             + New Calculation
           </Button>
@@ -206,6 +228,45 @@ export default function DashboardCalculationsPage() {
         />
       ) : (
         <div className="space-y-4">
+          {/* Comparison Selection Floating / Top Action Banner */}
+          {selectedForCompare.length > 0 && (
+            <div className="p-3.5 rounded-xl border border-brand-300 bg-brand-50 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-brand-900">
+                <Scale className="w-4 h-4 text-brand-600" />
+                <span>
+                  {selectedForCompare.length} of 2 calculations selected for comparison
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedForCompare.length === 2 ? (
+                  <Button
+                    href={`/dashboard/calculations/compare?a=${encodeURIComponent(
+                      selectedForCompare[0]
+                    )}&b=${encodeURIComponent(selectedForCompare[1])}`}
+                    size="sm"
+                    variant="primary"
+                    className="text-xs"
+                  >
+                    Compare Selected (2) &rarr;
+                  </Button>
+                ) : (
+                  <span className="text-xs text-brand-700 italic">
+                    Select 1 more calculation to compare
+                  </span>
+                )}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs text-brand-700 hover:bg-brand-100"
+                  onClick={() => setSelectedForCompare([])}
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="text-xs text-surface-500 font-medium">
             Showing {calculations.length} saved {calculations.length === 1 ? "calculation" : "calculations"}
           </div>
@@ -220,10 +281,14 @@ export default function DashboardCalculationsPage() {
               });
               const isQuarterly = calc.calculatorType === "quarterly_tax";
 
+              const isSelected = selectedForCompare.includes(calc.id);
+
               return (
                 <Card
                   key={calc.id}
-                  className="hover:border-surface-300 hover:shadow-card transition-all"
+                  className={`hover:border-surface-300 hover:shadow-card transition-all ${
+                    isSelected ? "border-brand-500 ring-1 ring-brand-500 bg-brand-50/20" : ""
+                  }`}
                 >
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     {/* Calculation Info */}
@@ -333,13 +398,51 @@ export default function DashboardCalculationsPage() {
 
                     {/* Actions */}
                     <div className="flex sm:flex-col lg:flex-row items-center gap-2 pt-2 lg:pt-0 border-t lg:border-t-0 border-surface-100">
+                      <Link href={`/ai-tax-assistant?calculationId=${encodeURIComponent(calc.id)}`} className="flex-1 sm:w-full lg:w-auto">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="w-full gap-1.5 text-xs font-semibold"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-brand-400" />
+                          Ask AI
+                        </Button>
+                      </Link>
+                      <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-1.5 cursor-pointer text-xs text-surface-500 hover:text-surface-800">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleCompareSelect(calc.id)}
+                            className="rounded border-surface-300 text-brand-600 focus:ring-brand-500 h-3.5 w-3.5"
+                          />
+                          <span className="text-[11px] font-medium">Compare</span>
+                        </label>
+                      </div>
+
+                      <Button
+                        href={`/dashboard/calculations/compare?a=${encodeURIComponent(calc.id)}`}
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 sm:w-full lg:w-auto text-xs"
+                      >
+                        Compare
+                      </Button>
                       <Button
                         href={`/dashboard/calculations/${calc.id}`}
                         size="sm"
                         variant="primary"
-                        className="flex-1 sm:w-full lg:w-auto"
+                        className="flex-1 sm:w-full lg:w-auto text-xs"
                       >
-                        View Detail
+                        Detail
+                      </Button>
+                      <Button
+                        href={`/dashboard/calculations/${calc.id}/report`}
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 sm:w-full lg:w-auto text-xs"
+                      >
+                        Report
                       </Button>
                       <Button
                         onClick={() => handleOpenInCalculator(calc)}

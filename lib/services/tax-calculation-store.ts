@@ -35,7 +35,35 @@ export class TaxCalculationStore {
    * Persists a validated tax calculation record.
    * Enforces server-side generated metadata and ownership.
    */
-  public static async save(record: TaxCalculationRecord): Promise<TaxCalculationRecord> {
+  public static async save(record: TaxCalculationRecord): Promise<TaxCalculationRecord>;
+  public static async save(
+    userId: string,
+    data: any
+  ): Promise<TaxCalculationRecord>;
+  public static async save(
+    userIdOrRecord: string | TaxCalculationRecord,
+    maybeData?: any
+  ): Promise<TaxCalculationRecord> {
+    let record: TaxCalculationRecord;
+    if (typeof userIdOrRecord === "string") {
+      const now = new Date().toISOString();
+      record = {
+        id: maybeData?.id || "calc_" + Math.random().toString(36).substring(2, 9),
+        userId: userIdOrRecord,
+        title: maybeData?.title || "Tax Calculation",
+        calculatorType: maybeData?.calculatorType || "income_tax",
+        taxYear: maybeData?.taxYear || 2025,
+        filingStatus: maybeData?.filingStatus || "single",
+        inputSnapshot: maybeData?.inputSnapshot || {},
+        resultSnapshot: maybeData?.resultSnapshot || {},
+        engineVersion: maybeData?.engineVersion || "1.0.0",
+        rulesVersion: maybeData?.rulesVersion || "2025.1",
+        createdAt: maybeData?.createdAt || now,
+        updatedAt: maybeData?.updatedAt || now,
+      };
+    } else {
+      record = userIdOrRecord;
+    }
     if (SUPABASE_CONFIG.isConfigured()) {
       const supabase = getServerSupabaseClient() as unknown as {
         from: (table: string) => {
@@ -326,6 +354,209 @@ export class TaxCalculationStore {
   }
 
   /**
+   * Admin-only: Lists calculations with pagination, search, and filtering.
+   * DATA MINIMIZATION: Returns operational metadata only, omitting massive snapshots.
+   */
+  public static async listAllForAdmin(options: {
+    q?: string;
+    taxYear?: number;
+    calculatorType?: string;
+    page?: number;
+    limit?: number;
+  } = {}): Promise<{
+    calculations: Array<{
+      id: string;
+      userId: string;
+      calculatorType: CalculatorType;
+      taxYear: TaxYear;
+      filingStatus: TaxFilingStatus;
+      title: string;
+      engineVersion: string;
+      rulesVersion: string;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const page = Math.max(1, options.page || 1);
+    const limit = Math.max(1, Math.min(100, options.limit || 20));
+
+    if (SUPABASE_CONFIG.isConfigured()) {
+      const supabase = getServerSupabaseClient() as unknown as {
+        from: (table: string) => {
+          select: (cols: string, opts?: { count: string }) => {
+            order: (col: string, opts: { ascending: boolean }) => {
+              range: (from: number, to: number) => Promise<{
+                data: TaxCalculationDbRow[] | null;
+                count: number | null;
+                error: { message: string } | null;
+              }>;
+            };
+          };
+        };
+      };
+
+      const from = (page - 1) * limit;
+      const to = from + limit - 1;
+
+      const { data, count, error } = await supabase
+        .from("tax_calculations")
+        .select("id, user_id, calculation_type, tax_year, filing_status, title, engine_version, rules_version, created_at, updated_at", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
+      if (error) {
+        throw new Error(`Failed to list calculations for admin: ${error.message}`);
+      }
+
+      const total = count || 0;
+      const calculations = (data || []).map((row) => ({
+        id: row.id,
+        userId: row.user_id,
+        calculatorType: row.calculation_type,
+        taxYear: row.tax_year,
+        filingStatus: row.filing_status,
+        title: row.title,
+        engineVersion: row.engine_version,
+        rulesVersion: row.rules_version,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+
+      return {
+        calculations,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit) || 1,
+      };
+    }
+
+    const store = getMemoryStore();
+    let items = Array.from(store.values());
+
+    if (options.calculatorType) {
+      items = items.filter((c) => c.calculatorType === options.calculatorType);
+    }
+    if (options.taxYear) {
+      items = items.filter((c) => c.taxYear === options.taxYear);
+    }
+    if (options.q && options.q.trim().length > 0) {
+      const q = options.q.trim().toLowerCase();
+      items = items.filter(
+        (c) =>
+          c.id.toLowerCase().includes(q) ||
+          c.userId.toLowerCase().includes(q) ||
+          c.title.toLowerCase().includes(q)
+      );
+    }
+
+    items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const total = items.length;
+    const startIdx = (page - 1) * limit;
+    const paginated = items.slice(startIdx, startIdx + limit);
+
+    return {
+      calculations: paginated.map((row) => ({
+        id: row.id,
+        userId: row.userId,
+        calculatorType: row.calculatorType,
+        taxYear: row.taxYear,
+        filingStatus: row.filingStatus,
+        title: row.title,
+        engineVersion: row.engineVersion,
+        rulesVersion: row.rulesVersion,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    };
+  }
+
+  /**
+   * Admin-only: Read-only inspection of a single calculation.
+   * IMMUTABILITY: Admin inspection cannot mutate calculation snapshot, engineVersion, or rulesVersion.
+   */
+  public static async getByIdForAdmin(id: string): Promise<TaxCalculationRecord | null> {
+    if (SUPABASE_CONFIG.isConfigured()) {
+      const supabase = getServerSupabaseClient() as unknown as {
+        from: (table: string) => {
+          select: (columns: string) => {
+            eq: (col: string, val: string) => {
+              single: () => Promise<{
+                data: TaxCalculationDbRow | null;
+                error: { message: string } | null;
+              }>;
+            };
+          };
+        };
+      };
+      const { data, error } = await supabase
+        .from("tax_calculations")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (error || !data) {
+        return null;
+      }
+
+      return {
+        id: data.id,
+        userId: data.user_id,
+        calculatorType: data.calculation_type,
+        taxYear: data.tax_year,
+        filingStatus: data.filing_status,
+        title: data.title,
+        inputSnapshot: data.input_snapshot,
+        resultSnapshot: data.result_snapshot,
+        engineVersion: data.engine_version,
+        rulesVersion: data.rules_version,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      };
+    }
+
+    const store = getMemoryStore();
+    const record = store.get(id);
+    if (!record) return null;
+    return { ...record };
+  }
+
+  /**
+   * Admin-only: Operational counts and breakdown for calculation analytics.
+   */
+  public static async countAll(): Promise<{
+    total: number;
+    byCalculatorType: Record<string, number>;
+    byTaxYear: Record<number, number>;
+  }> {
+    const store = getMemoryStore();
+    const all = Array.from(store.values());
+
+    const byCalculatorType: Record<string, number> = {};
+    const byTaxYear: Record<number, number> = {};
+
+    for (const item of all) {
+      byCalculatorType[item.calculatorType] = (byCalculatorType[item.calculatorType] || 0) + 1;
+      byTaxYear[item.taxYear] = (byTaxYear[item.taxYear] || 0) + 1;
+    }
+
+    return {
+      total: all.length,
+      byCalculatorType,
+      byTaxYear,
+    };
+  }
+
+  /**
    * Test utility to reset in-memory records between test suites.
    */
   public static clearStore(): void {
@@ -333,4 +564,9 @@ export class TaxCalculationStore {
       globalThis.__taxCalculationStore.clear();
     }
   }
+
+  public static clear(): void {
+    TaxCalculationStore.clearStore();
+  }
 }
+

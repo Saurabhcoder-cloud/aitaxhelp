@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { validateCurrencyInput } from "@/lib/utils/calculator-validation";
 import { POST } from "@/app/api/v1/tax/calculate/route";
+import { DEFAULT_DEV_SESSION_TOKEN } from "@/lib/auth/session";
 import { NextRequest } from "next/server";
 
 describe("Calculator UX Validation & API Integration Suite", () => {
@@ -71,16 +72,17 @@ describe("Calculator UX Validation & API Integration Suite", () => {
     it("handles valid income tax calculation request with versioned metadata", async () => {
       const req = new NextRequest("http://localhost:3000/api/v1/tax/calculate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${DEFAULT_DEV_SESSION_TOKEN}`,
+        },
         body: JSON.stringify({
           calculatorType: "income_tax",
-          payload: {
-            taxYear: 2025,
-            filingStatus: "single",
-            w2WagesCents: 8500000, // $85,000
-            otherIncomeCents: 0,
-            federalWithholdingCents: 1000000, // $10,000
-          },
+          taxYear: 2025,
+          filingStatus: "single",
+          w2WagesCents: 8500000, // $85,000
+          otherIncomeCents: 0,
+          federalWithholdingCents: 1000000, // $10,000
         }),
       });
 
@@ -102,16 +104,17 @@ describe("Calculator UX Validation & API Integration Suite", () => {
     it("handles quarterly tax calculation request with 4 vouchers summing to remaining tax", async () => {
       const req = new NextRequest("http://localhost:3000/api/v1/tax/calculate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${DEFAULT_DEV_SESSION_TOKEN}`,
+        },
         body: JSON.stringify({
           calculatorType: "quarterly_tax",
-          payload: {
-            taxYear: 2025,
-            filingStatus: "single",
-            estimatedAnnualGrossCents: 10000000, // $100,000
-            estimatedAnnualExpensesCents: 2000000, // $20,000
-            w2AnnualWithholdingCents: 200000, // $2,000
-          },
+          taxYear: 2025,
+          filingStatus: "single",
+          estimatedAnnualGrossCents: 10000000, // $100,000
+          estimatedAnnualExpensesCents: 2000000, // $20,000
+          w2AnnualWithholdingCents: 200000, // $2,000
         }),
       });
 
@@ -137,14 +140,15 @@ describe("Calculator UX Validation & API Integration Suite", () => {
     it("rejects negative wages with 422 validation error", async () => {
       const req = new NextRequest("http://localhost:3000/api/v1/tax/calculate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${DEFAULT_DEV_SESSION_TOKEN}`,
+        },
         body: JSON.stringify({
           calculatorType: "income_tax",
-          payload: {
-            taxYear: 2025,
-            filingStatus: "single",
-            w2WagesCents: -5000,
-          },
+          taxYear: 2025,
+          filingStatus: "single",
+          w2WagesCents: -5000,
         }),
       });
 
@@ -160,15 +164,16 @@ describe("Calculator UX Validation & API Integration Suite", () => {
     it("returns structured warnings for unsupported features (itemized deductions fallback)", async () => {
       const req = new NextRequest("http://localhost:3000/api/v1/tax/calculate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${DEFAULT_DEV_SESSION_TOKEN}`,
+        },
         body: JSON.stringify({
           calculatorType: "income_tax",
-          payload: {
-            taxYear: 2025,
-            filingStatus: "single",
-            w2WagesCents: 8000000,
-            itemizedDeductionCents: 2500000, // Schedule A unsupported
-          },
+          taxYear: 2025,
+          filingStatus: "single",
+          w2WagesCents: 8000000,
+          itemizedDeductionCents: 2500000, // Schedule A unsupported
         }),
       });
 
@@ -189,10 +194,12 @@ describe("Calculator UX Validation & API Integration Suite", () => {
     it("rejects invalid calculator type with 422 validation error", async () => {
       const req = new NextRequest("http://localhost:3000/api/v1/tax/calculate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${DEFAULT_DEV_SESSION_TOKEN}`,
+        },
         body: JSON.stringify({
           calculatorType: "unsupported_type",
-          payload: {},
         }),
       });
 

@@ -142,32 +142,60 @@ export class ConversationStore {
    * Persists a chat message in the conversation.
    */
   public static async saveMessage(
-    conversationId: string,
-    userId: string,
-    role: "user" | "assistant" | "system",
-    content: string,
+    conversationIdOrParams:
+      | string
+      | {
+          conversationId: string;
+          userId: string;
+          role: "user" | "assistant" | "system";
+          content: string;
+          attachedCalculationId?: string;
+        },
+    userId?: string,
+    role?: "user" | "assistant" | "system",
+    content?: string,
     attachedCalculationId?: string
   ): Promise<AIMessageRecord> {
+    let actualConvId: string;
+    let actualUserId: string;
+    let actualRole: "user" | "assistant" | "system";
+    let actualContent: string;
+    let actualCalcId: string | undefined;
+
+    if (typeof conversationIdOrParams === "object") {
+      actualConvId = conversationIdOrParams.conversationId;
+      actualUserId = conversationIdOrParams.userId;
+      actualRole = conversationIdOrParams.role;
+      actualContent = conversationIdOrParams.content;
+      actualCalcId = conversationIdOrParams.attachedCalculationId;
+    } else {
+      actualConvId = conversationIdOrParams;
+      actualUserId = userId || "";
+      actualRole = role || "user";
+      actualContent = content || "";
+      actualCalcId = attachedCalculationId;
+    }
+
     const { messages, conversations } = getMemoryStores();
     const now = new Date().toISOString();
     const id = crypto.randomUUID();
 
     const record: StoredMessage = {
       id,
-      conversationId,
-      userId,
-      role,
-      content,
-      attachedCalculationId,
+      conversationId: actualConvId,
+      userId: actualUserId,
+      role: actualRole,
+      content: actualContent,
+      attachedCalculationId: actualCalcId,
       createdAt: now,
     };
 
     // Update conversation updatedAt
-    const conv = conversations.get(conversationId);
+    const conv = conversations.get(actualConvId);
     if (conv) {
       conv.updatedAt = now;
-      if (conv.title === "Tax Assistance Session" && role === "user") {
-        conv.title = content.slice(0, 40) + (content.length > 40 ? "..." : "");
+      if (conv.title === "Tax Assistance Session" && actualRole === "user") {
+        conv.title = actualContent.slice(0, 40) + (actualContent.length > 40 ? "..." : "");
       }
     }
 
@@ -179,10 +207,10 @@ export class ConversationStore {
       };
       await supabase.from("ai_messages").insert({
         id: record.id,
-        conversation_id: conversationId,
+        conversation_id: actualConvId,
         role: record.role,
         content: record.content,
-        attached_calculation_id: attachedCalculationId || null,
+        attached_calculation_id: actualCalcId || null,
         created_at: now,
       });
     }
@@ -279,6 +307,13 @@ export class ConversationStore {
   }
 
   /**
+   * Alias for listUserConversations for backward compatibility.
+   */
+  public static async listConversations(userId: string): Promise<ConversationSummary[]> {
+    return this.listUserConversations(userId);
+  }
+
+  /**
    * Lists all conversations owned by a user for the dashboard.
    */
   public static async listUserConversations(userId: string): Promise<ConversationSummary[]> {
@@ -305,6 +340,97 @@ export class ConversationStore {
     );
   }
 
+  /**
+   * Admin-only: Returns operational metrics for AI assistant usage.
+   * DATA MINIMIZATION: Only returns aggregate counts and metadata, never taxpayer conversation text.
+   */
+  public static async getAdminMetrics(): Promise<{
+    totalConversations: number;
+    totalMessages: number;
+    calculationLinkedRequests: number;
+    recentActivity: Array<{
+      id: string;
+      conversationId: string;
+      role: "user" | "assistant" | "system";
+      createdAt: string;
+    }>;
+  }> {
+    const { conversations, messages } = getMemoryStores();
+
+    const totalConversations = conversations.size;
+    const totalMessages = messages.length;
+    const calculationLinkedRequests = messages.filter((m) => !!m.attachedCalculationId).length;
+
+    // Last 10 messages for operational activity timeline (no prompt content, only metadata)
+    const recentActivity = messages
+      .slice(-10)
+      .reverse()
+      .map((m) => ({
+        id: m.id,
+        conversationId: m.conversationId,
+        role: m.role,
+        createdAt: m.createdAt,
+      }));
+
+    return {
+      totalConversations,
+      totalMessages,
+      calculationLinkedRequests,
+      recentActivity,
+    };
+  }
+
+  /**
+   * Admin-only: Returns paginated list of conversations with operational metadata.
+   */
+  public static async listConversationsForAdmin(options: {
+    page?: number;
+    limit?: number;
+  } = {}): Promise<{
+    conversations: Array<{
+      id: string;
+      userId: string;
+      title: string;
+      messageCount: number;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const page = Math.max(1, options.page || 1);
+    const limit = Math.max(1, Math.min(100, options.limit || 20));
+    const { conversations, messages } = getMemoryStores();
+
+    const all = Array.from(conversations.values())
+      .map((conv) => {
+        const count = messages.filter((m) => m.conversationId === conv.id).length;
+        return {
+          id: conv.id,
+          userId: conv.userId,
+          title: conv.title,
+          messageCount: count,
+          createdAt: conv.createdAt,
+          updatedAt: conv.updatedAt,
+        };
+      })
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+    const total = all.length;
+    const startIdx = (page - 1) * limit;
+    const paginated = all.slice(startIdx, startIdx + limit);
+
+    return {
+      conversations: paginated,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    };
+  }
+
   public static clear(): void {
     if (globalThis.__conversationStore) {
       globalThis.__conversationStore.clear();
@@ -314,3 +440,4 @@ export class ConversationStore {
     }
   }
 }
+

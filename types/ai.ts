@@ -43,6 +43,7 @@ export interface AIAssistantRequest {
 
 export interface AIAssistantResponse {
   answer: string;
+  reply?: string;
   intent: TaxIntentCategory;
   calculation?: {
     result: TaxCalculationResult;

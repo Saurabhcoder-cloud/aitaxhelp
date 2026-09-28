@@ -1,6 +1,7 @@
 export const SITE_CONFIG = {
   name: "TaxAIHelp",
   domain: "taxaihelp.com",
+  canonicalDomain: "https://taxaihelp.com",
   url: process.env.NEXT_PUBLIC_SITE_URL || "https://taxaihelp.com",
   tagline: "Smarter Tax Help, Powered by AI",
   description:
@@ -14,7 +15,10 @@ export const SITE_CONFIG = {
     "self-employed tax calculator",
     "quarterly estimated tax calculator",
     "AI tax assistant",
-    "IRS tax brackets 2024",
-    "tax deductions",
+    "IRS tax brackets 2025",
+    "IRS tax brackets 2026",
+    "standard deduction",
+    "Schedule SE tax",
+    "Form 1040-ES",
   ],
 };

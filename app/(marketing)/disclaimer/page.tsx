@@ -1,83 +1,162 @@
 import React from "react";
 import { Metadata } from "next";
+import Link from "next/link";
 import { constructMetadata } from "../../../lib/seo/metadata";
 import { Container } from "../../../components/ui/Container";
-import { Card, CardContent } from "../../../components/ui/Card";
+import { Card } from "../../../components/ui/Card";
 import { Alert } from "../../../components/ui/Alert";
 import { Badge } from "../../../components/ui/Badge";
+import { Breadcrumbs } from "@/components/seo/Breadcrumbs";
+import {
+  AlertTriangle,
+  ShieldAlert,
+  Cpu,
+  Calculator,
+  HelpCircle,
+  FileCheck2,
+  Users,
+} from "lucide-react";
 
 export const metadata: Metadata = constructMetadata({
-  title: "Legal & Regulatory Disclaimer",
+  title: "Legal & Regulatory Disclaimer | TaxAIHelp Scope & Limitations",
   description:
-    "Important disclosures regarding the educational scope of TaxAIHelp calculations, lack of IRS affiliation, and recommendation to consult a licensed CPA.",
+    "Important statutory disclosures: TaxAIHelp is an educational estimation tool, not the IRS or a licensed CPA/EA firm. Deterministic math vs AI explanation boundaries.",
   path: "/disclaimer",
 });
 
 export default function DisclaimerPage() {
   return (
-    <div className="py-16 bg-surface-50 min-h-screen">
+    <div className="py-12 bg-surface-50 min-h-screen">
       <Container size="md">
+        <Breadcrumbs items={[{ name: "Disclaimer", item: "/disclaimer" }]} className="mb-6" />
+
         <div className="max-w-3xl mx-auto space-y-8">
           <div>
-            <Badge variant="amber" className="mb-3">
-              Compliance & Legal Notice
-            </Badge>
-            <h1 className="text-3xl sm:text-4xl font-black text-surface-900 tracking-tight">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-900 border border-amber-300 rounded-full text-xs font-semibold uppercase tracking-wider mb-3">
+              <ShieldAlert className="w-3.5 h-3.5 text-amber-700" />
+              <span>Statutory Compliance & Legal Scope</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-surface-900 tracking-tight">
               Legal & Calculation Disclaimer
             </h1>
             <p className="mt-2 text-xs text-surface-500">
-              Last updated: January 2025 • Applicable to all calculations and AI interactions
+              Effective Date: January 1, 2025 • Applicable to all calculators, reports, and AI interactions • TaxAIHelp (taxaihelp.com)
             </p>
           </div>
 
-          <Alert variant="warning" title="Not Tax or Legal Advice">
-            The information, calculators, and AI assistance provided on TaxAIHelp (taxaihelp.com) are intended strictly for educational and informational purposes. They do not constitute formal tax, legal, accounting, or financial planning advice.
+          <Alert variant="warning" title="Informational & Educational Platform Notice">
+            TaxAIHelp is an informational software tool. <strong>It does not provide certified legal, certified public accounting, or formal tax preparation services.</strong> Use of TaxAIHelp does not create a CPA-client, EA-client, or attorney-client relationship.
           </Alert>
 
-          <Card className="p-8 space-y-6 text-sm text-surface-700 leading-relaxed bg-white">
+          <Card className="p-8 space-y-8 text-sm text-surface-700 leading-relaxed bg-white shadow-xs">
+            {/* 1. Entity Disclosures */}
             <section className="space-y-3">
               <h2 className="text-lg font-bold text-surface-900">
-                1. No IRS Affiliation or Government Approval
+                1. No IRS Affiliation & No Professional Licensure
               </h2>
               <p>
-                TaxAIHelp is an independent educational platform. <strong>TaxAIHelp is NOT affiliated with, sponsored by, authorized by, or endorsed by the Internal Revenue Service (IRS), the United States Department of the Treasury, or any state or local taxing authority.</strong> No claim of IRS approval exists or should be inferred.
+                <strong>TaxAIHelp is an independent educational software platform.</strong>
+              </p>
+              <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm">
+                <li>TaxAIHelp is <strong>NOT affiliated with, sponsored by, approved by, or endorsed by</strong> the Internal Revenue Service (IRS), the US Department of the Treasury, or any state or municipal taxing authority.</li>
+                <li>TaxAIHelp is <strong>NOT a CPA firm, Enrolled Agent firm, or law firm.</strong> The platform does not hold professional licensure to represent taxpayers before the IRS or state tax agencies.</li>
+                <li>No statement on this website should be interpreted as an official governmental endorsement or authorized statutory certification.</li>
+              </ul>
+            </section>
+
+            {/* 2. Estimates Only & No Guarantees */}
+            <section className="space-y-3 border-t border-surface-200 pt-6">
+              <h2 className="text-lg font-bold text-surface-900">
+                2. Calculations Are Mathematical Estimates Only
+              </h2>
+              <p>
+                All numerical outputs, tax bracket assignments, self-employment tax calculations, and quarterly installment vouchers generated by TaxAIHelp are <strong>hypothetical estimates</strong> based strictly on user-supplied numbers and the specific rulesets encoded in our deterministic tax engine.
+              </p>
+              <p>
+                <strong>Zero Guarantees:</strong> TaxAIHelp makes <strong>no guarantees</strong> regarding:
+              </p>
+              <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm">
+                <li>Specific refund amounts or reductions in tax liabilities.</li>
+                <li>Filing acceptance or audit immunity by federal or state tax agencies.</li>
+                <li>Complete applicability to your personal, unique financial circumstances.</li>
+              </ul>
+            </section>
+
+            {/* 3. Deterministic Engine vs. AI Explanation Layer */}
+            <section className="space-y-3 border-t border-surface-200 pt-6">
+              <h2 className="text-lg font-bold text-surface-900 flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-brand-600" />
+                <span>3. Deterministic Engine vs. Artificial Intelligence (AI)</span>
+              </h2>
+              <p>
+                To prevent mathematical hallucinations and inaccuracies, TaxAIHelp enforces an architectural separation of concerns:
+              </p>
+              <div className="p-4 rounded-xl bg-surface-50 border border-surface-200 space-y-2 text-xs">
+                <p>
+                  <strong>The Deterministic Engine:</strong> Numerical calculations (brackets, standard deductions, Schedule SE factors) are executed strictly in integer cents according to published IRS Revenue Procedures.
+                </p>
+                <p>
+                  <strong>The AI Assistant:</strong> The artificial intelligence assistant (powered by Google Gemini) translates verified engine results into conversational plain English. <strong>The AI is not an authoritative calculator and should never be relied upon for autonomous financial arithmetic.</strong>
+                </p>
+              </div>
+            </section>
+
+            {/* 4. Scope & Unsupported Tax Scenarios */}
+            <section className="space-y-3 border-t border-surface-200 pt-6">
+              <h2 className="text-lg font-bold text-surface-900 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                <span>4. Supported Scope & Critical Limitations</span>
+              </h2>
+              <p>
+                TaxAIHelp specifically models US federal taxation under verified annual rulesets:
+              </p>
+              <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm">
+                <li><strong>2025 Rules:</strong> IRS IRB 2025-45 / P.L. 119-21 (One Big Beautiful Bill Act) & Rev. Proc. 2024-40. Standard deductions: $15,750 (Single) / $31,500 (MFJ); Social Security cap: $176,100.</li>
+                <li><strong>2026 Rules:</strong> IRS Revenue Procedure 2025-32 & SSA 2026 Fact Sheet. Standard deductions: $16,100 (Single) / $32,200 (MFJ); Social Security cap: $184,500.</li>
+              </ul>
+              <p className="font-semibold text-surface-900 pt-2 text-xs">
+                Unsupported Tax Areas (Must be evaluated independently):
+              </p>
+              <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm text-surface-600">
+                <li>State, county, and municipal income or business taxes.</li>
+                <li>Itemized deductions on Schedule A (medical expenses, mortgage interest, state tax caps).</li>
+                <li>Alternative Minimum Tax (AMT) under IRC § 55.</li>
+                <li>Foreign earned income exclusions (Form 2555) and foreign tax credits.</li>
+                <li>Complex capital gains, net investment income tax (NIIT), and passive loss limitations.</li>
+                <li>Corporate entity returns (Form 1120, 1120-S, or 1065).</li>
+              </ul>
+            </section>
+
+            {/* 5. Professional Matchmaking / Handoff */}
+            <section className="space-y-3 border-t border-surface-200 pt-6">
+              <h2 className="text-lg font-bold text-surface-900 flex items-center gap-2">
+                <Users className="w-4 h-4 text-brand-600" />
+                <span>5. Professional CPA/EA Referral Directory</span>
+              </h2>
+              <p>
+                When you submit an inquiry through our Tax Professional referral workflow, TaxAIHelp acts solely as a matching conduit between you and independent, licensed Certified Public Accountants (CPAs) or Enrolled Agents (EAs).
+              </p>
+              <p className="text-xs text-surface-600">
+                Independent professionals operate separate commercial practices. TaxAIHelp does not supervise, endorse, guarantee, or accept liability for the professional advice, return filings, or services rendered by third-party professionals. Users are responsible for independently verifying credentials and engagement terms.
               </p>
             </section>
 
+            {/* 6. User Responsibility & Recommendations */}
             <section className="space-y-3 border-t border-surface-200 pt-6">
               <h2 className="text-lg font-bold text-surface-900">
-                2. Calculations Are Deterministic Estimates
+                6. User Responsibility
               </h2>
               <p>
-                All calculators on TaxAIHelp provide mathematical estimates based on user-supplied numbers and standard IRS published tables (e.g., Rev. Proc. 2023-34 and 2022-38). Actual tax liabilities depend upon your complete and verified tax return, supporting documentation, state residency, municipal local taxes, and unique statutory deductions or limitations.
+                Tax laws are subject to legislative adjustments, judicial interpretations, and complex personal conditions. You are solely responsible for ensuring the accuracy of all tax returns filed with the IRS or state departments of revenue.
               </p>
-            </section>
-
-            <section className="space-y-3 border-t border-surface-200 pt-6">
-              <h2 className="text-lg font-bold text-surface-900">
-                3. No Guarantees of Refunds or Outcomes
-              </h2>
-              <p>
-                TaxAIHelp never guarantees any specific tax refund, tax savings, or liability reduction. Any calculations showing an estimated refund or amount owed reflect hypothetical mathematical scenarios based solely on the inputs you provide.
-              </p>
-            </section>
-
-            <section className="space-y-3 border-t border-surface-200 pt-6">
-              <h2 className="text-lg font-bold text-surface-900">
-                4. Unsupported Tax Situations
-              </h2>
-              <p>
-                In this foundation release, TaxAIHelp focuses strictly on basic US federal income tax, Schedule SE self-employment tax, and Form 1040-ES quarterly estimations. Unsupported tax situations—including but not limited to state and local taxes, Alternative Minimum Tax (AMT), foreign earned income exclusions, complex passive activity losses, and corporate entity filings—are NOT fully calculated and should not be relied upon as complete returns.
-              </p>
-            </section>
-
-            <section className="space-y-3 border-t border-surface-200 pt-6">
-              <h2 className="text-lg font-bold text-surface-900">
-                5. Recommendation to Consult Licensed Tax Professionals
-              </h2>
-              <p>
-                You should always verify important tax decisions, filings, and complex financial transactions with a qualified, licensed Certified Public Accountant (CPA), Enrolled Agent (EA), or tax attorney authorized to practice before the IRS.
-              </p>
+              <div className="pt-2">
+                <Link
+                  href="/tax-professionals"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 hover:text-brand-700 underline"
+                >
+                  <span>Connect with a licensed CPA or Enrolled Agent →</span>
+                </Link>
+              </div>
             </section>
           </Card>
         </div>

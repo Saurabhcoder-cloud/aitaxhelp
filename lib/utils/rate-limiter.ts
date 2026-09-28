@@ -68,4 +68,16 @@ export class RateLimiter {
       globalThis.__rateLimiterStore.clear();
     }
   }
+
+  public check(
+    identifier: string,
+    maxRequests: number = RateLimiter.MAX_REQUESTS,
+    windowMs: number = RateLimiter.WINDOW_MS
+  ): RateLimitCheckResult {
+    return RateLimiter.check(identifier, maxRequests, windowMs);
+  }
+
+  public clear(): void {
+    RateLimiter.clear();
+  }
 }

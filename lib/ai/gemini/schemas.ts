@@ -71,6 +71,7 @@ export const geminiExtractedIntentSchema = z.object({
 
 export const aiAssistantResponseSchema = z.object({
   answer: z.string().min(1),
+  reply: z.string().optional(),
   intent: taxIntentCategoryEnum,
   calculation: z
     .object({

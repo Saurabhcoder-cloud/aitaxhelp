@@ -105,11 +105,18 @@ export function Header() {
         {/* Right CTA Area */}
         <div className="flex items-center gap-3">
           <Link
+            href="/dashboard"
+            className="hidden xl:inline-flex items-center gap-1.5 text-xs font-semibold text-surface-700 hover:text-brand-600 px-2.5 py-1.5 rounded-lg hover:bg-surface-50 transition-colors"
+          >
+            Dashboard
+          </Link>
+
+          <Link
             href="/ai-tax-assistant"
             className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold text-surface-700 hover:text-brand-600 px-3 py-2 rounded-lg hover:bg-surface-50 transition-colors"
           >
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            AI Assistant
+            Try AI Tax Help
           </Link>
 
           <Button
@@ -117,7 +124,7 @@ export function Header() {
             size="sm"
             className="hidden sm:inline-flex shadow-sm"
           >
-            Calculate Taxes
+            Calculate Your Taxes
           </Button>
 
           {/* Mobile hamburger button */}

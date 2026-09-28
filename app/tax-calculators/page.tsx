@@ -1,9 +1,12 @@
 import React from "react";
 import { Metadata } from "next";
+import Link from "next/link";
 import { constructMetadata } from "../../lib/seo/metadata";
 import { Container } from "../../components/ui/Container";
 import { CalculatorCard } from "../../components/calculators/CalculatorCard";
+import { Breadcrumbs } from "../../components/seo/Breadcrumbs";
 import { LegalDisclaimerNotice } from "../../components/shared/LegalDisclaimerNotice";
+import { ArrowRight, Calendar, ShieldCheck } from "lucide-react";
 
 export const metadata: Metadata = constructMetadata({
   title: "Federal Tax Calculators Hub (2025 & 2026)",
@@ -87,22 +90,76 @@ export default function TaxCalculatorsHubPage() {
   return (
     <div className="py-12 bg-surface-50 min-h-screen">
       <Container size="xl">
+        <Breadcrumbs items={[{ name: "Tax Calculators", item: "/tax-calculators" }]} className="mb-6" />
+
         <div className="max-w-3xl mb-12">
           <h1 className="text-3xl sm:text-4xl font-black text-surface-900 tracking-tight">
             Deterministic Federal Tax Calculators
           </h1>
           <p className="mt-3 text-base sm:text-lg text-surface-600 leading-relaxed">
-            All calculations are executed in integer cents using official IRS statutory rules (IRS IRB 2025-45 / OBBBA for 2025 and Rev. Proc. 2025-32 for 2026). Select the calculator that matches your taxpayer situation below.
+            All calculations are executed in integer cents using official statutory IRS rules (IRS IRB 2025-45 / OBBBA for 2025 and Rev. Proc. 2025-32 for 2026). Select the calculator that matches your taxpayer situation below.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* 4 Core Calculators Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
           {calculators.map((calc) => (
             <CalculatorCard key={calc.title} {...calc} />
           ))}
         </div>
 
-        <div className="mt-16 max-w-4xl">
+        {/* Dedicated Tax-Year Architecture Callout */}
+        <div className="bg-white rounded-3xl border border-surface-200 p-8 shadow-xs mb-16 space-y-6">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-brand-600" />
+            <h2 className="text-xl font-bold text-surface-900 tracking-tight">
+              Dedicated Tax-Year Calculators
+            </h2>
+          </div>
+          <p className="text-sm text-surface-600 max-w-3xl leading-relaxed">
+            Need to evaluate a specific filing year with exact statutory standard deductions and Social Security wage caps? Explore our dedicated year-specific calculator pages:
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Link
+              href="/tax-calculators/2025-federal-income-tax-calculator"
+              className="p-6 rounded-2xl bg-surface-50 hover:bg-emerald-50/50 border border-surface-200 hover:border-emerald-300 transition-all group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                  Tax Year 2025
+                </span>
+                <ArrowRight className="w-4 h-4 text-surface-400 group-hover:text-emerald-700 group-hover:translate-x-1 transition-all" />
+              </div>
+              <h3 className="text-base font-bold text-surface-900 group-hover:text-emerald-900 mt-3">
+                2025 Federal Income Tax Calculator
+              </h3>
+              <p className="text-xs text-surface-600 mt-1 leading-relaxed">
+                Rules: IRS IRB 2025-45 (OBBBA). Standard deduction: $15,750 (Single) / $31,500 (MFJ). SSA wage cap: $176,100.
+              </p>
+            </Link>
+
+            <Link
+              href="/tax-calculators/2026-federal-income-tax-calculator"
+              className="p-6 rounded-2xl bg-surface-50 hover:bg-brand-50/50 border border-surface-200 hover:border-brand-300 transition-all group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand-100 text-brand-800">
+                  Tax Year 2026
+                </span>
+                <ArrowRight className="w-4 h-4 text-surface-400 group-hover:text-brand-700 group-hover:translate-x-1 transition-all" />
+              </div>
+              <h3 className="text-base font-bold text-surface-900 group-hover:text-brand-900 mt-3">
+                2026 Federal Income Tax Calculator
+              </h3>
+              <p className="text-xs text-surface-600 mt-1 leading-relaxed">
+                Rules: IRS Rev. Proc. 2025-32. Standard deduction: $16,100 (Single) / $32,200 (MFJ). SSA wage cap: $184,500.
+              </p>
+            </Link>
+          </div>
+        </div>
+
+        <div className="max-w-4xl">
           <LegalDisclaimerNotice />
         </div>
       </Container>

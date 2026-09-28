@@ -178,3 +178,14 @@ export const calculationIdParamSchema = z
   .min(1, "Calculation ID is required")
   .max(64, "Calculation ID is too long")
   .regex(/^[a-zA-Z0-9_-]+$/, "Invalid calculation ID format");
+
+export const compareCalculationsRequestSchema = z
+  .object({
+    calculationIdA: calculationIdParamSchema,
+    calculationIdB: calculationIdParamSchema,
+  })
+  .refine((data) => data.calculationIdA !== data.calculationIdB, {
+    message: "Cannot compare a calculation with itself. Please select two distinct calculations.",
+    path: ["calculationIdB"],
+  });
+

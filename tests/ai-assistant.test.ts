@@ -2,8 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { POST } from "../app/api/v1/ai/assistant/route";
 import { GET as getConversations } from "../app/api/v1/ai/conversations/route";
+import { GET as getConversationDetail } from "../app/api/v1/ai/conversations/[id]/route";
 import { ConversationStore } from "../lib/services/conversation-store";
 import { TaxCalculationStore } from "../lib/services/tax-calculation-store";
+import { UsageStore } from "../lib/services/usage-store";
+import { SubscriptionStore } from "../lib/services/subscription-store";
 import { RateLimiter } from "../lib/utils/rate-limiter";
 import { setGeminiMockHandler } from "../lib/ai/gemini/client";
 import { aiAssistantResponseSchema } from "../lib/ai/gemini/schemas";
@@ -36,6 +39,8 @@ describe("AI Tax Assistant Integration & Architectural Boundary Suite", () => {
     ConversationStore.clear();
     TaxCalculationStore.clearStore();
     RateLimiter.clear();
+    UsageStore.clear();
+    SubscriptionStore.clear();
     setGeminiMockHandler(null);
   });
 
@@ -344,6 +349,18 @@ describe("AI Tax Assistant Integration & Architectural Boundary Suite", () => {
 
   it("14. Enforces rate limiting per user ID (HTTP 429 RATE_LIMITED)", async () => {
     const userId = "test-user-rate-limited";
+    await SubscriptionStore.save({
+      id: "sub-rate-limit-test",
+      userId,
+      planId: "premium",
+      status: "active",
+      provider: "stripe",
+      currentPeriodStart: new Date().toISOString(),
+      currentPeriodEnd: new Date(Date.now() + 30 * 86400000).toISOString(),
+      cancelAtPeriodEnd: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
 
     // Rate limit is 20 requests per minute
     for (let i = 0; i < 20; i++) {
@@ -413,5 +430,163 @@ describe("AI Tax Assistant Integration & Architectural Boundary Suite", () => {
 
     const parsed = aiAssistantResponseSchema.safeParse(json.data);
     expect(parsed.success).toBe(true);
+  });
+
+  it("18. Gracefully handles non-existent or invalid calculation ID with 404 NOT_FOUND", async () => {
+    const req = createMockRequest("http://localhost:3000/api/v1/ai/assistant", {
+      body: {
+        message: "Explain this calculation",
+        calculationId: "calc-does-not-exist-12345",
+      },
+      token: "test-user-invalid-calc",
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(404);
+
+    const json = await res.json();
+    expect(json.success).toBe(false);
+    expect(json.error.code).toBe("NOT_FOUND");
+    expect(json.error.message).toContain("not found or access is denied");
+  });
+
+  it("19. Subsequent request without calculation ID succeeds independently after a failed calculation reference", async () => {
+    // 1st request with non-existent calculation fails with 404
+    const failReq = createMockRequest("http://localhost:3000/api/v1/ai/assistant", {
+      body: {
+        message: "Explain calculation",
+        calculationId: "calc-stale-99999",
+      },
+      token: "test-user-recovery",
+    });
+    const failRes = await POST(failReq);
+    expect(failRes.status).toBe(404);
+
+    // 2nd request without calculation ID immediately succeeds
+    setGeminiMockHandler(async () => "General educational explanation for recovery");
+    const recoverReq = createMockRequest("http://localhost:3000/api/v1/ai/assistant", {
+      body: { message: "What are the standard tax brackets for 2025?" },
+      token: "test-user-recovery",
+    });
+    const recoverRes = await POST(recoverReq);
+    expect(recoverRes.status).toBe(200);
+
+    const recoverJson = await recoverRes.json();
+    expect(recoverJson.success).toBe(true);
+    expect(recoverJson.data.answer).toContain("General educational explanation");
+  });
+
+  it("20. Persists multi-turn conversation messages in correct chronological order", async () => {
+    setGeminiMockHandler(async (_sys, prompt) => `Response to: ${prompt.slice(0, 30)}`);
+
+    const userToken = "test-user-multiturn";
+
+    // Turn 1
+    const req1 = createMockRequest("http://localhost:3000/api/v1/ai/assistant", {
+      body: { message: "Turn 1: What is the filing deadline for 2025 taxes?" },
+      token: userToken,
+    });
+    const res1 = await POST(req1);
+    const json1 = await res1.json();
+    const convId = json1.data.conversationId;
+    expect(convId).toBeDefined();
+
+    // Turn 2 in same conversation
+    const req2 = createMockRequest("http://localhost:3000/api/v1/ai/assistant", {
+      body: {
+        message: "Turn 2: What about the extension deadline?",
+        conversationId: convId,
+      },
+      token: userToken,
+    });
+    const res2 = await POST(req2);
+    const json2 = await res2.json();
+    expect(json2.data.conversationId).toBe(convId);
+
+    // Retrieve via conversation detail endpoint
+    const detailReq = createMockRequest(
+      `http://localhost:3000/api/v1/ai/conversations/${convId}`,
+      {
+        method: "GET",
+        token: userToken,
+      }
+    );
+    const detailRes = await getConversationDetail(detailReq, {
+      params: { id: convId },
+    });
+    expect(detailRes.status).toBe(200);
+
+    const detailJson = await detailRes.json();
+    expect(detailJson.success).toBe(true);
+    expect(detailJson.data.length).toBe(4); // 2 user turns + 2 assistant responses
+    expect(detailJson.data[0].role).toBe("user");
+    expect(detailJson.data[0].content).toContain("Turn 1");
+    expect(detailJson.data[1].role).toBe("assistant");
+    expect(detailJson.data[2].role).toBe("user");
+    expect(detailJson.data[2].content).toContain("Turn 2");
+    expect(detailJson.data[3].role).toBe("assistant");
+  });
+
+  it("21. Returns conversation list with correct messageCount, latest message preview, and chronological ordering", async () => {
+    const userToken = "test-user-list-preview";
+
+    // Create session 1
+    const req1 = createMockRequest("http://localhost:3000/api/v1/ai/assistant", {
+      body: { message: "First session: W-2 tax question" },
+      token: userToken,
+    });
+    await POST(req1);
+
+    // Create session 2
+    const req2 = createMockRequest("http://localhost:3000/api/v1/ai/assistant", {
+      body: { message: "Second session: 1099 deductions question" },
+      token: userToken,
+    });
+    await POST(req2);
+
+    const listReq = createMockRequest("http://localhost:3000/api/v1/ai/conversations", {
+      method: "GET",
+      token: userToken,
+    });
+    const listRes = await getConversations(listReq);
+    expect(listRes.status).toBe(200);
+
+    const listJson = await listRes.json();
+    expect(listJson.success).toBe(true);
+    expect(listJson.data.length).toBe(2);
+
+    // Sorted newest first
+    expect(listJson.data[0].messageCount).toBe(2); // 1 user + 1 assistant
+    expect(listJson.data[0].lastMessage).toBeDefined();
+    expect(listJson.data[1].messageCount).toBe(2);
+  });
+
+  it("22. Strictly isolates conversation detail across users (User B cannot read User A's conversation)", async () => {
+    // User A creates conversation
+    const reqA = createMockRequest("http://localhost:3000/api/v1/ai/assistant", {
+      body: { message: "User A private tax inquiry" },
+      token: "user-a-isolate",
+    });
+    const resA = await POST(reqA);
+    const jsonA = await resA.json();
+    const convId = jsonA.data.conversationId;
+
+    // User B attempts to access User A's conversation via detail endpoint
+    const reqB = createMockRequest(
+      `http://localhost:3000/api/v1/ai/conversations/${convId}`,
+      {
+        method: "GET",
+        token: "user-b-isolate",
+      }
+    );
+    const resB = await getConversationDetail(reqB, {
+      params: { id: convId },
+    });
+    expect(resB.status).toBe(200);
+
+    const jsonB = await resB.json();
+    // Strictly zero access: returns empty array
+    expect(jsonB.success).toBe(true);
+    expect(jsonB.data).toEqual([]);
   });
 });

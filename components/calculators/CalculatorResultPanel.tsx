@@ -8,6 +8,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { saveCalculation } from "@/lib/utils/calculation-history-api";
+import { Sparkles } from "lucide-react";
 
 export interface CalculatorResultPanelProps {
   result: TaxCalculationResult;
@@ -127,6 +128,15 @@ export function CalculatorResultPanel({
                     >
                       View →
                     </Link>
+                    {savedCalculationId && (
+                      <Link
+                        href={`/ai-tax-assistant?calculationId=${encodeURIComponent(savedCalculationId)}`}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-900 underline"
+                      >
+                        <Sparkles className="w-3 h-3 text-brand-600" />
+                        Ask AI →
+                      </Link>
+                    )}
                   </div>
                 ) : (
                   <Button

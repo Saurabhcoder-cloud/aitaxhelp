@@ -74,6 +74,22 @@ export function MobileNav({ isOpen, onClose }: MobileNavProps) {
                 )}
               </div>
             ))}
+            <div className="pt-2 border-t border-surface-100 flex flex-col space-y-2">
+              <Link
+                href="/dashboard"
+                onClick={onClose}
+                className="font-semibold text-brand-700 hover:text-brand-900 transition-colors text-base"
+              >
+                Dashboard &amp; Settings →
+              </Link>
+              <Link
+                href="/login"
+                onClick={onClose}
+                className="text-sm font-medium text-surface-600 hover:text-surface-900 transition-colors"
+              >
+                Sign In / Account
+              </Link>
+            </div>
           </nav>
         </div>
 

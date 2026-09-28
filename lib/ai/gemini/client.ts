@@ -1,10 +1,17 @@
 import { GEMINI_CONFIG } from "./config";
 
-type GeminiMockHandler = (
+export type GeminiMockResult =
+  | string
+  | {
+      text: string;
+      model?: string;
+    };
+
+export type GeminiMockHandler = (
   systemInstruction: string,
   userPrompt: string,
   responseSchema?: Record<string, unknown>
-) => Promise<string> | string;
+) => Promise<GeminiMockResult> | GeminiMockResult;
 
 let activeMockHandler: GeminiMockHandler | null = null;
 
@@ -28,7 +35,11 @@ export async function callGeminiApi(
 ): Promise<string> {
   // 1. Check for active test mock handler first
   if (activeMockHandler) {
-    return await activeMockHandler(systemInstruction, userPrompt, responseSchema);
+    const mockRes = await activeMockHandler(systemInstruction, userPrompt, responseSchema);
+    if (typeof mockRes === "object" && mockRes !== null && "text" in mockRes) {
+      return mockRes.text;
+    }
+    return String(mockRes);
   }
 
   // 2. Offline / Unconfigured Fallback
@@ -53,7 +64,7 @@ export async function callGeminiApi(
   }
 
   // 3. Live Google Generative AI REST Endpoint
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_CONFIG.modelName}:generateContent?key=${GEMINI_CONFIG.apiKey}`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_CONFIG.modelName}:generateContent`;
 
   const payload: Record<string, unknown> = {
     systemInstruction: {
@@ -74,13 +85,18 @@ export async function callGeminiApi(
 
   const response = await fetch(endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": GEMINI_CONFIG.apiKey,
+    },
     body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error("[GEMINI_API_ERROR]", response.status, errorText);
+    // Sanitize any key fragments from error text before logging
+    const safeErrorText = errorText.replace(/key=[^&\s]+/gi, "key=[REDACTED]");
+    console.error("[GEMINI_API_ERROR]", response.status, safeErrorText);
     throw new Error(`Gemini API responded with status ${response.status}`);
   }
 

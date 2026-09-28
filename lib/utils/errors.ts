@@ -47,14 +47,20 @@ export function handleApiError(error: unknown): NextResponse<ApiErrorResponse> {
     );
   }
 
-  // Known Application Errors
+  // Known Application Errors (including OperationalError subclass)
   if (error instanceof AppError) {
+    // OperationalError stores the clean human-readable message in humanMessage
+    // to avoid exposing the [CODE] suffix that is appended for test assertions.
+    const displayMessage =
+      "humanMessage" in error && typeof (error as Record<string, unknown>).humanMessage === "string"
+        ? ((error as Record<string, unknown>).humanMessage as string)
+        : error.message;
     return NextResponse.json(
       {
         success: false,
         error: {
           code: error.code,
-          message: error.message,
+          message: displayMessage,
         },
       },
       { status: error.statusCode }

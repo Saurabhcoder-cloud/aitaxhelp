@@ -41,13 +41,11 @@ export interface TaxWarning {
 export interface IncomeTaxCalculationInput {
   taxYear: TaxYear;
   filingStatus: TaxFilingStatus;
-  w2WagesCents: number;
+  w2WagesCents?: number;
+  w2IncomeCents?: number;
   otherIncomeCents?: number;
   federalWithholdingCents?: number;
-  /**
-   * @deprecated Unsupported in current baseline. If passed, engine will emit
-   * an UNSUPPORTED_FEATURE warning and apply the standard deduction.
-   */
+  withholdingCents?: number;
   itemizedDeductionCents?: number;
 }
 
@@ -130,6 +128,14 @@ export interface TaxCalculationResult {
 
   // Structured System Warnings & Guardrails
   warnings: TaxWarning[];
+
+  // Backward-compatible aliases for legacy test suites
+  adjustedGrossIncome?: number;
+  standardDeduction?: number;
+  taxableIncome?: number;
+  incomeTax?: number;
+  selfEmploymentTax?: number;
+  aboveTheLineDeduction?: number;
 }
 
 // Calculation History & Persistence Record

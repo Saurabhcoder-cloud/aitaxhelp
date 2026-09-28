@@ -18,9 +18,16 @@ import {
 import { AuthenticatedUser } from "@/lib/auth/session";
 import { TaxCalculationStore } from "@/lib/services/tax-calculation-store";
 import { ConversationStore } from "@/lib/services/conversation-store";
+import { UserProfileStore } from "@/lib/services/user-profile-store";
 import { RateLimiter } from "@/lib/utils/rate-limiter";
 import { AppError } from "@/lib/utils/errors";
 import { toCents, formatCurrencyFromCents } from "@/lib/utils/currency";
+import {
+  generateTaxPlanningInsights,
+  extractTaxDrivers,
+} from "@/lib/services/tax-insights";
+import { EntitlementService } from "@/lib/services/entitlement-service";
+
 
 export interface DeterministicTaxToolInput {
   taxYear?: TaxYear;
@@ -104,7 +111,10 @@ function containsInjectionPatterns(message: string): boolean {
 /**
  * Quick heuristic detection of intent and numerical parameters from text.
  */
-function extractHeuristicParameters(message: string): {
+function extractHeuristicParameters(
+  message: string,
+  userDefaults?: { defaultTaxYear?: TaxYear; filingStatus?: TaxFilingStatus }
+): {
   intent: TaxIntentCategory;
   parameters: DeterministicTaxToolInput;
   hasEnoughDataForCalc: boolean;
@@ -167,8 +177,8 @@ function extractHeuristicParameters(message: string): {
 
   let w2Income = 0;
   const is1099 = lower.includes("1099") || lower.includes("self-employed") || lower.includes("freelance");
-  let filingStatus: TaxFilingStatus = "single";
-  let taxYear: TaxYear = 2025;
+  let filingStatus: TaxFilingStatus = userDefaults?.filingStatus || "single";
+  let taxYear: TaxYear = userDefaults?.defaultTaxYear || 2025;
 
   if (lower.includes("married filing jointly") || lower.includes("jointly")) {
     filingStatus = "married_filing_jointly";
@@ -176,10 +186,14 @@ function extractHeuristicParameters(message: string): {
     filingStatus = "head_of_household";
   } else if (lower.includes("married filing separately")) {
     filingStatus = "married_filing_separately";
+  } else if (lower.includes("single")) {
+    filingStatus = "single";
   }
 
   if (lower.includes("2026")) {
     taxYear = 2026;
+  } else if (lower.includes("2025")) {
+    taxYear = 2025;
   } else if (lower.includes("2024")) {
     taxYear = 2024;
   }
@@ -291,7 +305,7 @@ export async function processAssistantRequest(
   user: AuthenticatedUser,
   request: AIAssistantRequest
 ): Promise<AIAssistantResponse> {
-  // 1. Rate Limiting Check
+  // 1. Rate Limiting Check (Burst Protection)
   const rateLimit = RateLimiter.check(user.id);
   if (!rateLimit.allowed) {
     throw new AppError(
@@ -301,13 +315,23 @@ export async function processAssistantRequest(
     );
   }
 
-  // 2. Get or initialize conversation session
+  // 2. Entitlement & Daily Quota Check (Usage Limits)
+  const aiEntitlement = await EntitlementService.checkAiMessageEntitlement(user.id);
+  if (!aiEntitlement.allowed) {
+    throw new AppError(
+      `Daily AI assistant message limit reached (${aiEntitlement.limit} messages). Upgrade to Premium for 100 daily messages.`,
+      403,
+      "UPGRADE_REQUIRED"
+    );
+  }
+
+  // 3. Get or initialize conversation session
   const conversation = await ConversationStore.getOrCreateConversation(
     user.id,
     request.conversationId
   );
 
-  // 3. Save incoming user message
+  // 4. Save incoming user message
   await ConversationStore.saveMessage(
     conversation.id,
     user.id,
@@ -315,6 +339,9 @@ export async function processAssistantRequest(
     request.message,
     request.calculationId
   );
+
+  // 5. Record usage against user's daily quota server-side
+  await EntitlementService.recordAiMessageUsage(user.id);
 
   // 4. Prompt injection defense
   if (containsInjectionPatterns(request.message)) {
@@ -332,6 +359,7 @@ export async function processAssistantRequest(
 
     return {
       answer: defenseAnswer,
+      reply: defenseAnswer,
       intent: "GENERAL_TAX_QUESTION",
       conversationId: conversation.id,
       suggestedActions: [
@@ -357,7 +385,23 @@ export async function processAssistantRequest(
     }
 
     // STRICT: Historical calculations are NEVER recalculated.
-    const res = historicalCalc.resultSnapshot;
+    const rawRes = historicalCalc.resultSnapshot;
+    const res: TaxCalculationResult = {
+      ...rawRes,
+      calculationId: rawRes.calculationId || historicalCalc.id,
+      totalPaymentsAndWithholdingCents: rawRes.totalPaymentsAndWithholdingCents ?? 0,
+      bracketBreakdown: rawRes.bracketBreakdown || [],
+      deductionType: rawRes.deductionType || "standard",
+    };
+    const structuredInsights = generateTaxPlanningInsights(res, historicalCalc.inputSnapshot);
+    const taxDrivers = extractTaxDrivers(res);
+
+    const driversSummary = taxDrivers
+      .map((d) => `- ${d.title} (${d.importance}): ${d.impactDescription}`)
+      .join("\n");
+    const insightsSummary = structuredInsights
+      .map((i) => `- [${i.category.toUpperCase()}] ${i.title}: ${i.explanation}`)
+      .join("\n");
 
     let explanation = "";
     try {
@@ -371,8 +415,17 @@ export async function processAssistantRequest(
         `- Taxable Income: ${formatCurrencyFromCents(res.taxableIncomeCents)}\n` +
         `- Federal Liability: ${formatCurrencyFromCents(res.totalTaxLiabilityCents)}\n` +
         `- Effective Rate: ${(res.effectiveTaxRate * 100).toFixed(1)}%\n` +
+        `- Withholding / Payments: ${formatCurrencyFromCents(res.totalPaymentsAndWithholdingCents)}\n` +
+        `- Balance Status: ${res.estimatedRefundCents > 0 ? `Refund of ${formatCurrencyFromCents(res.estimatedRefundCents)}` : res.estimatedAmountOwedCents > 0 ? `Amount Due of ${formatCurrencyFromCents(res.estimatedAmountOwedCents)}` : "Balanced ($0.00)"}\n` +
         `- Engine Version: ${historicalCalc.engineVersion}\n` +
-        `- Ruleset: ${historicalCalc.rulesVersion}\n`;
+        `- Ruleset: ${historicalCalc.rulesVersion}\n\n` +
+        `Verified Tax Drivers:\n${driversSummary}\n\n` +
+        `Verified Planning Insights & Statutory Scope Limitations:\n${insightsSummary}\n\n` +
+        `CRITICAL PLANNING RULES:\n` +
+        `1. Do NOT calculate or invent new tax figures. All numbers must strictly match the verified calculation above.\n` +
+        `2. If the user asks how to reduce their taxes ("How can I reduce this?"), explain ONLY supported educational considerations (e.g. above-the-line SE deductions, standard deduction, withholding adjustments via W-4/1040-ES).\n` +
+        `3. If the user asks about unsupported items (state taxes, itemized deductions on Schedule A, energy credits, complex retirement accounts), explicitly state they are outside the current calculator's scope and suggest consulting a licensed CPA or EA.\n` +
+        `4. Do not promise or guarantee tax savings or refunds.`;
 
       explanation = await callGeminiApi(SYSTEM_PROMPTS.taxExplainer, prompt);
     } catch (_err) {
@@ -392,6 +445,7 @@ export async function processAssistantRequest(
 
     return {
       answer: explanation,
+      reply: explanation,
       intent: "EXPLAIN_CALCULATION",
       calculation: {
         result: res,
@@ -407,8 +461,21 @@ export async function processAssistantRequest(
     };
   }
 
-  // 6. Intent Classification & Parameter Extraction
-  const heuristic = extractHeuristicParameters(request.message);
+  // 6. Intent Classification & Parameter Extraction with Safe Profile Personalization
+  let userTaxProfile: { defaultTaxYear?: TaxYear; filingStatus?: TaxFilingStatus } | undefined;
+  try {
+    const loadedProfile = await UserProfileStore.getTaxProfile(user.id);
+    if (loadedProfile) {
+      userTaxProfile = {
+        defaultTaxYear: loadedProfile.defaultTaxYear,
+        filingStatus: loadedProfile.filingStatus,
+      };
+    }
+  } catch (_err) {
+    // Graceful fallback to standard defaults
+  }
+
+  const heuristic = extractHeuristicParameters(request.message, userTaxProfile);
   let verifiedCalculation: TaxCalculationResult | undefined;
 
   if (heuristic.intent === "UNSUPPORTED_REQUEST") {
@@ -478,6 +545,15 @@ export async function processAssistantRequest(
     if (heuristic.hasEnoughDataForCalc) {
       // Deterministic engine calculation
       verifiedCalculation = calculateFederalTax(heuristic.parameters);
+      const structuredInsights = generateTaxPlanningInsights(verifiedCalculation);
+      const taxDrivers = extractTaxDrivers(verifiedCalculation);
+
+      const driversSummary = taxDrivers
+        .map((d) => `- ${d.title} (${d.importance}): ${d.impactDescription}`)
+        .join("\n");
+      const insightsSummary = structuredInsights
+        .map((i) => `- [${i.category.toUpperCase()}] ${i.title}: ${i.explanation}`)
+        .join("\n");
 
       let explanation = "";
       try {
@@ -493,7 +569,14 @@ export async function processAssistantRequest(
           `- Total Federal Liability: ${formatCurrencyFromCents(verifiedCalculation.totalTaxLiabilityCents)}\n` +
           `- Effective Rate: ${(verifiedCalculation.effectiveTaxRate * 100).toFixed(1)}%\n` +
           `- Engine: ${verifiedCalculation.engineVersion}\n` +
-          `- Rules: ${verifiedCalculation.rulesVersion}\n`;
+          `- Rules: ${verifiedCalculation.rulesVersion}\n\n` +
+          `Verified Tax Drivers:\n${driversSummary}\n\n` +
+          `Verified Planning Insights & Scope Limitations:\n${insightsSummary}\n\n` +
+          `CRITICAL PLANNING RULES:\n` +
+          `1. Do NOT calculate or invent new tax figures. All numbers must strictly match the verified calculation above.\n` +
+          `2. If the user asks how to reduce their taxes, explain ONLY supported educational considerations.\n` +
+          `3. If the user asks about unsupported items (state taxes, itemized deductions on Schedule A, energy credits, complex retirement accounts), explicitly state they are outside the current calculator's scope and suggest consulting a licensed CPA or EA.\n` +
+          `4. Do not promise or guarantee tax savings or refunds.`;
 
         explanation = await callGeminiApi(SYSTEM_PROMPTS.taxExplainer, prompt);
       } catch (_err) {
@@ -512,6 +595,7 @@ export async function processAssistantRequest(
 
       return {
         answer: explanation,
+        reply: explanation,
         intent: "CALCULATE_TAX",
         calculation: {
           result: verifiedCalculation,
@@ -536,6 +620,7 @@ export async function processAssistantRequest(
 
       return {
         answer: askForInputs,
+        reply: askForInputs,
         intent: "CALCULATE_TAX",
         conversationId: conversation.id,
         suggestedActions: [
@@ -549,19 +634,29 @@ export async function processAssistantRequest(
   // 8. General Educational Tax Question
   let generalAnswer = "";
   try {
-    const prompt = `User question: "${request.message}"\nProvide a clear, accurate, educational response based on standard US federal tax rules.`;
+    const profileContext = userTaxProfile
+      ? `\nTaxpayer Profile Baseline Context (educational reference only, do not assume facts not asked): Default Tax Year: ${userTaxProfile.defaultTaxYear}, Filing Status: ${userTaxProfile.filingStatus}.`
+      : "";
+    const prompt = `User question: "${request.message}"${profileContext}\nProvide a clear, accurate, educational response based on standard US federal tax rules.`;
     generalAnswer = await callGeminiApi(SYSTEM_PROMPTS.taxExplainer, prompt);
   } catch (_err) {
+    const year = userTaxProfile?.defaultTaxYear || 2025;
+    const stdDeduction =
+      year === 2026
+        ? (userTaxProfile?.filingStatus === "married_filing_jointly" ? "$32,200" : "$16,100")
+        : (userTaxProfile?.filingStatus === "married_filing_jointly" ? "$31,500" : "$15,750");
+
     generalAnswer =
-      "For individual taxpayers in 2025, standard deductions are $15,750 for Single filers, $31,500 for Married Filing Jointly, and $23,625 for Head of Household. " +
-      "Ordinary income is taxed across 7 progressive statutory rate brackets (10%, 12%, 22%, 24%, 32%, 35%, and 37%). " +
-      "For detailed scenarios, you can run our interactive calculators below.";
+      `For individual taxpayers in ${year}, the standard deduction is ${stdDeduction} for your baseline status (${userTaxProfile?.filingStatus?.replace(/_/g, " ") || "single"}). ` +
+      `Ordinary income is taxed across 7 progressive statutory rate brackets (10%, 12%, 22%, 24%, 32%, 35%, and 37%). ` +
+      `For detailed scenarios, you can run our interactive calculators below.`;
   }
 
   await ConversationStore.saveMessage(conversation.id, user.id, "assistant", generalAnswer);
 
   return {
     answer: generalAnswer,
+    reply: generalAnswer,
     intent: "GENERAL_TAX_QUESTION",
     conversationId: conversation.id,
     suggestedActions: [

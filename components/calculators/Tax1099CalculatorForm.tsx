@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { TaxFilingStatus, TaxYear, TaxCalculationResult } from "@/types/tax";
+import { TaxProfile } from "@/types/supabase";
 import { formatCurrencyFromCents } from "@/lib/utils/currency";
 import { validateCurrencyInput } from "@/lib/utils/calculator-validation";
 import { requestTaxCalculation } from "@/lib/utils/calculator-api";
@@ -14,6 +15,8 @@ import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { CalculatorResultPanel } from "./CalculatorResultPanel";
+import { CalculatorPrefillNotice } from "./CalculatorPrefillNotice";
+import { useCalculatorPrefill } from "@/lib/utils/calculator-prefill";
 
 export function Tax1099CalculatorForm() {
   const [taxYear, setTaxYear] = useState<TaxYear>(2025);
@@ -30,6 +33,24 @@ export function Tax1099CalculatorForm() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [result, setResult] = useState<TaxCalculationResult | null>(null);
+  const hasMountedRef = useRef(false);
+
+  // Intelligently prefill calculator from saved taxpayer profile (PREFILL ONLY, no auto-calculate)
+  const handlePrefillLoaded = useCallback(
+    (defaults: { taxYear: TaxYear; filingStatus: TaxFilingStatus; taxProfile: TaxProfile }) => {
+      setTaxYear(defaults.taxYear);
+      setFilingStatus(defaults.filingStatus);
+    },
+    []
+  );
+
+  const {
+    taxProfile,
+    isSavingDefault,
+    saveDefaultSuccess,
+    saveDefaultError,
+    saveAsDefault,
+  } = useCalculatorPrefill(handlePrefillLoaded);
 
   const currentStandardDeductionCents = React.useMemo(() => {
     try {
@@ -157,6 +178,9 @@ export function Tax1099CalculatorForm() {
   );
 
   useEffect(() => {
+    if (hasMountedRef.current) return;
+    hasMountedRef.current = true;
+
     if (typeof window !== "undefined") {
       const stored = window.sessionStorage.getItem("taxaihelp_reopen_calculation");
       if (stored) {
@@ -239,6 +263,17 @@ export function Tax1099CalculatorForm() {
                   />
                 </FormField>
               </div>
+
+              {/* Personalization Prefill Notice & Save Default Action */}
+              <CalculatorPrefillNotice
+                taxProfile={taxProfile}
+                currentYear={taxYear}
+                currentStatus={filingStatus}
+                isSaving={isSavingDefault}
+                saveSuccess={saveDefaultSuccess}
+                saveError={saveDefaultError}
+                onSaveAsDefault={() => saveAsDefault(taxYear, filingStatus)}
+              />
 
               <FormField
                 label="Total 1099 Gross Earnings"

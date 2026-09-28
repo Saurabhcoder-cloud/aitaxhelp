@@ -1,16 +1,21 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { TaxCalculationRecord, CalculatorType } from "@/types/tax";
 import { formatCurrencyFromCents } from "@/lib/utils/currency";
 import { fetchCalculationById } from "@/lib/utils/calculation-history-api";
 import { CalculatorResultPanel } from "@/components/calculators/CalculatorResultPanel";
+import { TaxInsightsPanel } from "@/components/calculators/TaxInsightsPanel";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { Sparkles, Scale, FileText, UserCheck, LifeBuoy } from "lucide-react";
+
+
 import {
   incomeTaxInputSchema,
   selfEmployedInputSchema,
@@ -205,13 +210,71 @@ export default function CalculationDetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Link href={`/dashboard/calculations/${calculation.id}/report`}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 font-semibold text-xs"
+            >
+              <FileText className="w-3.5 h-3.5 text-brand-600" />
+              Tax Report
+            </Button>
+          </Link>
+          <Link href={`/dashboard/calculations/${calculation.id}/professional`}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 font-semibold text-xs"
+            >
+              <UserCheck className="w-3.5 h-3.5 text-brand-600" />
+              Tax Pro
+            </Button>
+          </Link>
+          <Link href={`/dashboard/calculations/compare?a=${encodeURIComponent(calculation.id)}`}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 font-semibold text-xs"
+            >
+              <Scale className="w-3.5 h-3.5 text-brand-600" />
+              Compare
+            </Button>
+          </Link>
+          <Link href={`/ai-tax-assistant?calculationId=${encodeURIComponent(calculation.id)}`}>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="gap-1.5 font-semibold text-xs shadow-sm"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-brand-400" />
+              Explain with AI
+            </Button>
+          </Link>
           <Button
             onClick={handleOpenInCalculator}
-            variant="primary"
+            variant="outline"
             size="sm"
           >
-            Open in Calculator
+            Open
           </Button>
+          <Link
+            href={`/dashboard/support/new?category=TAX_CALCULATION&calculationId=${encodeURIComponent(
+              calculation.id
+            )}&calculatorType=${encodeURIComponent(
+              calculation.calculatorType
+            )}&taxYear=${calculation.taxYear}&filingStatus=${encodeURIComponent(
+              calculation.filingStatus
+            )}`}
+          >
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 font-semibold text-xs text-surface-600 hover:text-red-700"
+            >
+              <LifeBuoy className="w-3.5 h-3.5" />
+              Report Issue
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -228,8 +291,17 @@ export default function CalculationDetailPage() {
             This calculation preserves the exact deterministic tax engine results calculated on <strong>{formattedCreated}</strong> using Tax Engine <strong>v{calculation.engineVersion}</strong> and <strong>{calculation.rulesVersion}</strong>. It is not recomputed with newer rules.
           </p>
         </div>
-        <div className="text-right text-[11px] text-brand-700 font-mono whitespace-nowrap">
-          ID: {calculation.id.slice(0, 8)}...
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/ai-tax-assistant?calculationId=${encodeURIComponent(calculation.id)}`}
+            className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-brand-900 underline text-xs"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-brand-600" />
+            Ask AI to Explain →
+          </Link>
+          <span className="text-[11px] text-brand-700 font-mono whitespace-nowrap">
+            ID: {calculation.id.slice(0, 8)}...
+          </span>
         </div>
       </div>
 
@@ -309,6 +381,13 @@ export default function CalculationDetailPage() {
         result={res}
         inputSnapshot={calculation.inputSnapshot}
         hideSaveAction={true}
+      />
+
+      {/* Educational Tax Planning & Drivers Insights Layer */}
+      <TaxInsightsPanel
+        result={res}
+        inputSnapshot={calculation.inputSnapshot}
+        title={calculation.title}
       />
     </div>
   );

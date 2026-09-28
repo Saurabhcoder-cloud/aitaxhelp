@@ -4,6 +4,7 @@ import {
   QuarterlyTaxCalculationInput,
   TaxCalculationResult,
   TaxWarning,
+  TaxYear,
 } from "../types/tax";
 import { getTaxRules } from "./rules";
 import { resolveDeductions } from "./calculations/deductions";
@@ -44,8 +45,8 @@ export function calculateIncomeTax(
   const rules = getTaxRules(input.taxYear);
   const warnings = getStandardWarnings();
 
-  const grossIncomeCents = input.w2WagesCents + (input.otherIncomeCents ?? 0);
-  const withholdingCents = input.federalWithholdingCents ?? 0;
+  const grossIncomeCents = (input.w2WagesCents ?? input.w2IncomeCents ?? 0) + (input.otherIncomeCents ?? 0);
+  const withholdingCents = input.federalWithholdingCents ?? input.withholdingCents ?? 0;
 
   // Deductions: Standard deduction in current baseline
   const deduction = resolveDeductions(
@@ -106,6 +107,14 @@ export function calculateIncomeTax(
     bracketBreakdown: breakdown,
 
     warnings,
+
+    // Backward-compatible aliases for legacy test suites
+    adjustedGrossIncome: grossIncomeCents,
+    standardDeduction: deduction.deductionUsedCents,
+    taxableIncome: taxableIncomeCents,
+    incomeTax: federalIncomeTaxCents,
+    selfEmploymentTax: 0,
+    aboveTheLineDeduction: 0,
   };
 }
 
@@ -202,6 +211,14 @@ export function calculateSelfEmployedTax(
     },
 
     warnings,
+
+    // Backward-compatible aliases for legacy test suites
+    adjustedGrossIncome: adjustedGrossIncomeCents,
+    standardDeduction: deduction.deductionUsedCents,
+    taxableIncome: taxableIncomeCents,
+    incomeTax: federalIncomeTaxCents,
+    selfEmploymentTax: seOutput.totalSelfEmploymentTaxCents,
+    aboveTheLineDeduction: seOutput.deductibleHalfCents,
   };
 }
 
@@ -248,6 +265,50 @@ export function calculateQuarterlyTax(
     },
     warnings,
   };
+}
+
+/**
+ * Backward-compatible adapter for tests and legacy callers.
+ * Delegates directly to calculateIncomeTax or calculateSelfEmployedTax.
+ */
+export function calculateFederalTaxes(input: {
+  taxYear: TaxYear;
+  filingStatus: any;
+  wages?: number;
+  w2Wages?: number;
+  w2WagesCents?: number;
+  w2IncomeCents?: number;
+  withholdingPaid?: number;
+  federalWithholdingCents?: number;
+  withholdingCents?: number;
+  otherIncomeCents?: number;
+  scheduleCNetProfit?: number;
+  gross1099IncomeCents?: number;
+  businessExpensesCents?: number;
+  itemizedDeductionCents?: number;
+}): TaxCalculationResult {
+  const wagesVal = input.wages ?? input.w2Wages ?? input.w2WagesCents ?? input.w2IncomeCents ?? 0;
+  const withholdingVal = input.withholdingPaid ?? input.federalWithholdingCents ?? input.withholdingCents ?? 0;
+
+  if (input.scheduleCNetProfit !== undefined || input.gross1099IncomeCents !== undefined) {
+    return calculateSelfEmployedTax({
+      taxYear: input.taxYear,
+      filingStatus: input.filingStatus,
+      gross1099IncomeCents: input.scheduleCNetProfit ?? input.gross1099IncomeCents ?? 0,
+      businessExpensesCents: input.businessExpensesCents ?? 0,
+      w2WagesCents: wagesVal,
+      federalWithholdingCents: withholdingVal,
+    });
+  }
+
+  return calculateIncomeTax({
+    taxYear: input.taxYear,
+    filingStatus: input.filingStatus,
+    w2WagesCents: wagesVal,
+    otherIncomeCents: input.otherIncomeCents ?? 0,
+    federalWithholdingCents: withholdingVal,
+    itemizedDeductionCents: input.itemizedDeductionCents,
+  });
 }
 
 export * from "./types";

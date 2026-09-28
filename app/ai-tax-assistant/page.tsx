@@ -23,6 +23,10 @@ import {
   ShieldCheck,
   CheckCircle2,
   ArrowRight,
+  RotateCcw,
+  X,
+  FileText,
+  LifeBuoy,
 } from "lucide-react";
 
 const SAMPLE_STARTER_PROMPTS = [
@@ -33,21 +37,97 @@ const SAMPLE_STARTER_PROMPTS = [
   "Which tax calculator should I use as a self-employed freelancer?",
 ];
 
+/**
+ * Safe, type-safe inline renderer for assistant markdown text
+ * Converts bold (**text**), inline code (`code`), and list items without innerHTML.
+ */
+function FormattedMessageText({ text }: { text: string }) {
+  const lines = text.split("\n");
+
+  const renderInline = (str: string) => {
+    const parts: React.ReactNode[] = [];
+    const regex = /(\*\*.*?\*\*|`.*?`)/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(str)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(str.substring(lastIndex, match.index));
+      }
+      const token = match[0];
+      if (token.startsWith("**") && token.endsWith("**")) {
+        parts.push(
+          <strong key={match.index} className="font-semibold text-surface-900">
+            {token.slice(2, -2)}
+          </strong>
+        );
+      } else if (token.startsWith("`") && token.endsWith("`")) {
+        parts.push(
+          <code
+            key={match.index}
+            className="px-1.5 py-0.5 rounded bg-surface-100 font-mono text-[12px] text-surface-800 border border-surface-200"
+          >
+            {token.slice(1, -1)}
+          </code>
+        );
+      }
+      lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < str.length) {
+      parts.push(str.substring(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : str;
+  };
+
+  return (
+    <div className="space-y-1.5 text-surface-800 leading-relaxed font-sans text-sm break-words overflow-hidden">
+      {lines.map((line, idx) => {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          return <div key={idx} className="h-2" />;
+        }
+        if (trimmed.startsWith("• ") || trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+          return (
+            <div key={idx} className="flex items-start gap-2 ml-2">
+              <span className="text-brand-600 font-bold leading-tight">•</span>
+              <span className="flex-1">{renderInline(trimmed.substring(2))}</span>
+            </div>
+          );
+        }
+        const numMatch = trimmed.match(/^(\d+)\.\s+(.*)/);
+        if (numMatch) {
+          return (
+            <div key={idx} className="flex items-start gap-2 ml-2">
+              <span className="font-semibold text-brand-700 min-w-[1.2rem]">{numMatch[1]}.</span>
+              <span className="flex-1">{renderInline(numMatch[2])}</span>
+            </div>
+          );
+        }
+        return <p key={idx}>{renderInline(line)}</p>;
+      })}
+    </div>
+  );
+}
+
 function AIAssistantContent() {
   const searchParams = useSearchParams();
   const queryCalculationId = searchParams.get("calculationId") || undefined;
   const queryConversationId = searchParams.get("conversationId") || undefined;
 
   const [conversationId, setConversationId] = useState<string | undefined>(queryConversationId);
+  const [activeCalculationId, setActiveCalculationId] = useState<string | undefined>(queryCalculationId);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyLoadNotice, setHistoryLoadNotice] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [lastFailedText, setLastFailedText] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
   const calculationExplainedRef = useRef(false);
 
   const initWelcomeMessage = useCallback(() => {
@@ -82,6 +162,8 @@ function AIAssistantContent() {
       }
 
       setErrorMessage(null);
+      setLastFailedText(null);
+
       const userMsg: ChatMessage = {
         id: "msg_user_" + Date.now(),
         role: "user",
@@ -93,8 +175,9 @@ function AIAssistantContent() {
       setInputMessage("");
       setIsSubmitting(true);
 
+      const activeCalcId = calculationIdOverride !== undefined ? calculationIdOverride : activeCalculationId;
+
       try {
-        const activeCalcId = calculationIdOverride || queryCalculationId;
         const response = await sendAssistantMessage({
           message: text,
           calculationId: activeCalcId,
@@ -124,13 +207,22 @@ function AIAssistantContent() {
       } catch (err: unknown) {
         const errorText = err instanceof Error ? err.message : "Service error. Please try again.";
         setErrorMessage(errorText);
+        setLastFailedText(text);
+
+        // If the calculation context was missing or unauthorized, detach it safely to unblock future messages
+        if (
+          errorText.toLowerCase().includes("referenced calculation was not found") ||
+          errorText.toLowerCase().includes("not found")
+        ) {
+          setActiveCalculationId(undefined);
+        }
 
         const errorMsg: ChatMessage = {
           id: "msg_err_" + Date.now(),
           role: "assistant",
           content:
             "I encountered an issue processing your query through our secure server. " +
-            "Please verify your inputs or jump directly to our interactive tax calculators below.",
+            "You can retry below, verify your inputs, or jump directly to our interactive tax calculators.",
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           suggestedActions: [
             { label: "Federal Income Tax Calculator", href: "/tax-calculators/income-tax" },
@@ -144,15 +236,28 @@ function AIAssistantContent() {
         textareaRef.current?.focus();
       }
     },
-    [inputMessage, isSubmitting, queryCalculationId, conversationId]
+    [inputMessage, isSubmitting, activeCalculationId, conversationId]
   );
+
+  const handleRetry = useCallback(() => {
+    if (lastFailedText) {
+      handleSendMessage(lastFailedText);
+    }
+  }, [lastFailedText, handleSendMessage]);
 
   const handleStartNewSession = () => {
     setConversationId(undefined);
+    setActiveCalculationId(undefined);
     setErrorMessage(null);
+    setLastFailedText(null);
+    setHistoryLoadNotice(null);
     setInputMessage("");
     calculationExplainedRef.current = false;
     initWelcomeMessage();
+  };
+
+  const handleDetachCalculation = () => {
+    setActiveCalculationId(undefined);
   };
 
   useEffect(() => {
@@ -163,6 +268,7 @@ function AIAssistantContent() {
   useEffect(() => {
     if (queryConversationId) {
       setIsLoadingHistory(true);
+      setHistoryLoadNotice(null);
       fetchConversationMessages(queryConversationId).then((res) => {
         setIsLoadingHistory(false);
         if (res.success && res.data && res.data.length > 0) {
@@ -179,6 +285,9 @@ function AIAssistantContent() {
             }))
           );
         } else {
+          // If conversation cannot be found or is empty, reset to new session cleanly
+          setConversationId(undefined);
+          setHistoryLoadNotice("Previous conversation could not be loaded. Initialized a fresh session.");
           initWelcomeMessage();
         }
       });
@@ -206,12 +315,12 @@ function AIAssistantContent() {
   };
 
   return (
-    <div className="py-8 bg-surface-50 min-h-[calc(100vh-4rem)]">
+    <div className="py-4 sm:py-8 bg-surface-50 min-h-[calc(100vh-4rem)]">
       <Container size="lg">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
           <div>
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
               <Badge variant="emerald" size="sm" className="gap-1">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 Verified Deterministic Engine
@@ -224,7 +333,7 @@ function AIAssistantContent() {
             <h1 className="text-2xl sm:text-3xl font-extrabold text-surface-900 tracking-tight">
               AI Tax Assistant
             </h1>
-            <p className="text-sm text-surface-600 mt-1 max-w-2xl">
+            <p className="text-xs sm:text-sm text-surface-600 mt-1 max-w-2xl">
               Get IRS-compliant educational explanations and verified tax calculations. The deterministic tax engine is the sole calculation authority.
             </p>
           </div>
@@ -234,7 +343,7 @@ function AIAssistantContent() {
             <Link href="/dashboard/conversations">
               <Button variant="outline" size="sm" className="gap-1.5 text-xs">
                 <History className="w-3.5 h-3.5" />
-                Past Sessions
+                <span>Past Sessions</span>
               </Button>
             </Link>
             <Button
@@ -245,17 +354,66 @@ function AIAssistantContent() {
               className="gap-1.5 text-xs"
             >
               <PlusCircle className="w-3.5 h-3.5" />
-              New Session
+              <span>New Session</span>
             </Button>
+            <Link
+              href={`/dashboard/support/new?category=AI_ASSISTANT${
+                conversationId ? `&conversationId=${encodeURIComponent(conversationId)}` : ""
+              }${activeCalculationId ? `&calculationId=${encodeURIComponent(activeCalculationId)}` : ""}`}
+            >
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs text-surface-600 hover:text-red-700">
+                <LifeBuoy className="w-3.5 h-3.5" />
+                <span>Report Issue</span>
+              </Button>
+            </Link>
           </div>
         </div>
+
+        {/* History load notice if conversation could not be loaded */}
+        {historyLoadNotice && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>{historyLoadNotice}</span>
+            </div>
+            <button
+              onClick={() => setHistoryLoadNotice(null)}
+              className="text-amber-700 hover:text-amber-900 p-1 rounded hover:bg-amber-100"
+              aria-label="Dismiss notice"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Active Attached Calculation Context Pill */}
+        {activeCalculationId && (
+          <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-emerald-700 shrink-0" />
+              <span>
+                <strong>Calculation Context Attached:</strong> AI answers are informed by your saved calculation (ID:{" "}
+                <span className="font-mono text-emerald-800">{activeCalculationId.slice(0, 8)}...</span>)
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDetachCalculation}
+              className="h-7 px-2.5 text-[11px] text-emerald-800 border-emerald-300 hover:bg-emerald-100"
+            >
+              <X className="w-3 h-3 mr-1" />
+              Detach Context
+            </Button>
+          </div>
+        )}
 
         {/* Main Conversation Container */}
         <Card className="max-w-4xl mx-auto p-0 overflow-hidden shadow-card border-surface-200">
           {/* Header Bar */}
-          <CardHeader className="bg-navy-950 text-white px-5 py-4 m-0 border-b border-navy-800 flex flex-row items-center justify-between">
+          <CardHeader className="bg-navy-950 text-white px-4 sm:px-5 py-3.5 sm:py-4 m-0 border-b border-navy-800 flex flex-row items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-brand-600 flex items-center justify-center font-bold text-white shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-brand-600 flex items-center justify-center font-bold text-white shadow-sm shrink-0">
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -276,7 +434,7 @@ function AIAssistantContent() {
           </CardHeader>
 
           {/* Messages Feed */}
-          <div className="p-4 sm:p-6 min-h-[440px] max-h-[600px] overflow-y-auto space-y-6 bg-surface-50/50">
+          <div className="p-3 sm:p-6 min-h-[380px] h-[55vh] sm:h-[580px] max-h-[640px] overflow-y-auto space-y-5 bg-surface-50/50">
             {isLoadingHistory ? (
               <div className="flex flex-col items-center justify-center h-64 text-surface-500 gap-2">
                 <RefreshCw className="w-6 h-6 animate-spin text-brand-600" />
@@ -289,19 +447,19 @@ function AIAssistantContent() {
                   className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[92%] sm:max-w-[82%] rounded-2xl p-4 sm:p-5 text-sm leading-relaxed shadow-sm ${
+                    className={`max-w-[94%] sm:max-w-[84%] rounded-2xl p-3.5 sm:p-5 text-sm leading-relaxed shadow-sm ${
                       msg.role === "user"
                         ? "bg-brand-600 text-white rounded-tr-none"
                         : "bg-white border border-surface-200 text-surface-900 rounded-tl-none"
                     }`}
                   >
-                    {/* CRITICAL STEP 14: Clear visual distinction between Verified Engine Result vs AI Explanation */}
+                    {/* Clear visual distinction between Verified Engine Result vs AI Explanation */}
                     {msg.verifiedCalculation && (
-                      <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 text-surface-900">
+                      <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 sm:p-4 text-surface-900">
                         {/* Verified Engine Banner */}
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200/80 pb-3 mb-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200/80 pb-2.5 mb-3">
                           <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                             <span>VERIFIED TAX CALCULATION (DETERMINISTIC ENGINE)</span>
                           </div>
                           <div className="flex items-center gap-1 text-[11px] font-mono text-emerald-700">
@@ -315,77 +473,77 @@ function AIAssistantContent() {
                         </div>
 
                         {/* Numeric Grid (Authoritative Engine Numbers Only) */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs font-mono">
-                          <div className="bg-white/80 p-2.5 rounded-lg border border-emerald-100">
-                            <span className="block text-[10px] uppercase font-sans text-surface-500 font-semibold">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs font-mono">
+                          <div className="bg-white/90 p-2 sm:p-2.5 rounded-lg border border-emerald-100">
+                            <span className="block text-[10px] uppercase font-sans text-surface-500 font-semibold truncate">
                               Gross Income
                             </span>
-                            <span className="font-bold text-surface-900">
+                            <span className="font-bold text-surface-900 truncate block">
                               {formatCurrencyFromCents(msg.verifiedCalculation.grossIncomeCents)}
                             </span>
                           </div>
 
-                          <div className="bg-white/80 p-2.5 rounded-lg border border-emerald-100">
-                            <span className="block text-[10px] uppercase font-sans text-surface-500 font-semibold">
+                          <div className="bg-white/90 p-2 sm:p-2.5 rounded-lg border border-emerald-100">
+                            <span className="block text-[10px] uppercase font-sans text-surface-500 font-semibold truncate">
                               Standard Deduction
                             </span>
-                            <span className="font-bold text-surface-900">
+                            <span className="font-bold text-surface-900 truncate block">
                               {formatCurrencyFromCents(msg.verifiedCalculation.deductionUsedCents)}
                             </span>
                           </div>
 
-                          <div className="bg-white/80 p-2.5 rounded-lg border border-emerald-100">
-                            <span className="block text-[10px] uppercase font-sans text-surface-500 font-semibold">
+                          <div className="bg-white/90 p-2 sm:p-2.5 rounded-lg border border-emerald-100">
+                            <span className="block text-[10px] uppercase font-sans text-surface-500 font-semibold truncate">
                               Taxable Income
                             </span>
-                            <span className="font-bold text-surface-900">
+                            <span className="font-bold text-surface-900 truncate block">
                               {formatCurrencyFromCents(msg.verifiedCalculation.taxableIncomeCents)}
                             </span>
                           </div>
 
-                          <div className="bg-white/80 p-2.5 rounded-lg border border-emerald-100">
-                            <span className="block text-[10px] uppercase font-sans text-surface-500 font-semibold">
+                          <div className="bg-white/90 p-2 sm:p-2.5 rounded-lg border border-emerald-100">
+                            <span className="block text-[10px] uppercase font-sans text-surface-500 font-semibold truncate">
                               Federal Income Tax
                             </span>
-                            <span className="font-bold text-brand-700">
+                            <span className="font-bold text-brand-700 truncate block">
                               {formatCurrencyFromCents(msg.verifiedCalculation.federalIncomeTaxCents)}
                             </span>
                           </div>
 
                           {msg.verifiedCalculation.selfEmploymentTaxCents > 0 && (
-                            <div className="bg-white/80 p-2.5 rounded-lg border border-emerald-100">
-                              <span className="block text-[10px] uppercase font-sans text-surface-500 font-semibold">
+                            <div className="bg-white/90 p-2 sm:p-2.5 rounded-lg border border-emerald-100">
+                              <span className="block text-[10px] uppercase font-sans text-surface-500 font-semibold truncate">
                                 Self-Employment Tax
                               </span>
-                              <span className="font-bold text-amber-700">
+                              <span className="font-bold text-amber-700 truncate block">
                                 {formatCurrencyFromCents(msg.verifiedCalculation.selfEmploymentTaxCents)}
                               </span>
                             </div>
                           )}
 
-                          <div className="bg-white/80 p-2.5 rounded-lg border border-emerald-100">
-                            <span className="block text-[10px] uppercase font-sans text-surface-500 font-semibold">
-                              Total Federal Liability
+                          <div className="bg-white/90 p-2 sm:p-2.5 rounded-lg border border-emerald-100">
+                            <span className="block text-[10px] uppercase font-sans text-surface-500 font-semibold truncate">
+                              Total Liability
                             </span>
-                            <span className="font-bold text-emerald-800">
+                            <span className="font-bold text-emerald-800 truncate block">
                               {formatCurrencyFromCents(msg.verifiedCalculation.totalTaxLiabilityCents)}
                             </span>
                           </div>
 
-                          <div className="bg-white/80 p-2.5 rounded-lg border border-emerald-100">
-                            <span className="block text-[10px] uppercase font-sans text-surface-500 font-semibold">
+                          <div className="bg-white/90 p-2 sm:p-2.5 rounded-lg border border-emerald-100">
+                            <span className="block text-[10px] uppercase font-sans text-surface-500 font-semibold truncate">
                               Effective / Marginal
                             </span>
-                            <span className="font-semibold text-surface-800">
+                            <span className="font-semibold text-surface-800 truncate block">
                               {(msg.verifiedCalculation.effectiveTaxRate * 100).toFixed(1)}% / {(msg.verifiedCalculation.marginalTaxBracket * 100).toFixed(0)}%
                             </span>
                           </div>
 
-                          <div className="col-span-2 sm:col-span-2 bg-emerald-100/70 p-2.5 rounded-lg border border-emerald-200">
-                            <span className="block text-[10px] uppercase font-sans text-emerald-800 font-semibold">
+                          <div className="col-span-2 sm:col-span-2 bg-emerald-100/70 p-2 sm:p-2.5 rounded-lg border border-emerald-200">
+                            <span className="block text-[10px] uppercase font-sans text-emerald-800 font-semibold truncate">
                               Position Balance
                             </span>
-                            <span className="font-bold text-emerald-950">
+                            <span className="font-bold text-emerald-950 truncate block">
                               {msg.verifiedCalculation.estimatedRefundCents > 0
                                 ? `Estimated Refund: ${formatCurrencyFromCents(msg.verifiedCalculation.estimatedRefundCents)}`
                                 : msg.verifiedCalculation.estimatedAmountOwedCents > 0
@@ -420,22 +578,26 @@ function AIAssistantContent() {
                     )}
 
                     {/* AI Explanation Content */}
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       {msg.role === "assistant" && (
                         <div className="flex items-center gap-1.5 text-[11px] font-semibold text-brand-700 mb-1">
-                          <Sparkles className="w-3.5 h-3.5" />
-                          <span>AI Educational Explanation & Guidance:</span>
+                          <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                          <span>AI Educational Guidance:</span>
                         </div>
                       )}
-                      <div className="whitespace-pre-line text-surface-800 leading-relaxed font-sans">
-                        {msg.content}
-                      </div>
+                      {msg.role === "assistant" ? (
+                        <FormattedMessageText text={msg.content} />
+                      ) : (
+                        <div className="whitespace-pre-line break-words overflow-hidden">
+                          {msg.content}
+                        </div>
+                      )}
                     </div>
 
-                    {/* Suggested Action Chips (Step 15) */}
+                    {/* Suggested Action Chips */}
                     {msg.suggestedActions && msg.suggestedActions.length > 0 && (
                       <div className="mt-4 pt-3 border-t border-surface-100 flex flex-wrap gap-1.5">
-                        {msg.suggestedActions.map((action, idx) => (
+                        {msg.suggestedActions.map((action, idx) =>
                           action.href ? (
                             <Link
                               key={idx}
@@ -456,7 +618,7 @@ function AIAssistantContent() {
                               {action.label}
                             </button>
                           )
-                        ))}
+                        )}
                       </div>
                     )}
 
@@ -494,7 +656,7 @@ function AIAssistantContent() {
 
           {/* Quick Starter Chips */}
           {messages.length <= 1 && (
-            <div className="px-5 py-3 bg-surface-100/70 border-t border-surface-200/80">
+            <div className="px-4 sm:px-5 py-3 bg-surface-100/70 border-t border-surface-200/80">
               <span className="text-[11px] font-semibold text-surface-500 uppercase tracking-wider block mb-2">
                 Frequently Asked Scenarios:
               </span>
@@ -514,26 +676,43 @@ function AIAssistantContent() {
             </div>
           )}
 
-          {/* Error Banner */}
+          {/* Error Banner with Retry Action */}
           {errorMessage && (
-            <div className="px-5 py-2.5 bg-rose-50 border-t border-rose-200 flex items-center justify-between text-xs text-rose-700">
-              <div className="flex items-center gap-2">
+            <div className="px-4 sm:px-5 py-2.5 bg-rose-50 border-t border-rose-200 flex flex-wrap items-center justify-between gap-2 text-xs text-rose-800">
+              <div className="flex items-center gap-2 max-w-full truncate">
                 <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
-                <span>{errorMessage}</span>
+                <span className="truncate">{errorMessage}</span>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setErrorMessage(null)}
-                className="h-6 px-2 text-[10px] text-rose-700 border-rose-300 hover:bg-rose-100"
-              >
-                Dismiss
-              </Button>
+              <div className="flex items-center gap-2">
+                {lastFailedText && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRetry}
+                    disabled={isSubmitting}
+                    className="h-6 px-2 text-[11px] text-rose-800 border-rose-300 bg-white hover:bg-rose-100 gap-1"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    Retry
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setErrorMessage(null);
+                    setLastFailedText(null);
+                  }}
+                  className="h-6 px-2 text-[10px] text-rose-700 border-rose-300 hover:bg-rose-100"
+                >
+                  Dismiss
+                </Button>
+              </div>
             </div>
           )}
 
           {/* Input & Composer */}
-          <div className="p-4 bg-white border-t border-surface-200">
+          <div className="p-3 sm:p-4 bg-white border-t border-surface-200">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -551,12 +730,12 @@ function AIAssistantContent() {
                   rows={2}
                   maxLength={1000}
                   disabled={isSubmitting}
-                  className="w-full resize-none rounded-xl px-4 py-3 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none disabled:bg-surface-50"
+                  className="w-full resize-none rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none disabled:bg-surface-50"
                 />
 
                 <div className="flex items-center justify-between px-3 py-2 border-t border-surface-100 bg-surface-50/50 rounded-b-xl">
                   <div className="flex items-center gap-2 text-[11px] text-surface-400">
-                    <span>
+                    <span className={inputMessage.length >= 950 ? "text-amber-600 font-semibold" : ""}>
                       {inputMessage.length} / 1000
                     </span>
                     <span className="hidden sm:inline">• Press Enter to send, Shift+Enter for new line</span>
@@ -599,4 +778,3 @@ export default function AIAssistantPage() {
     </Suspense>
   );
 }
-
