@@ -34,6 +34,9 @@ export function setSessionToken(token: string): void {
 
   // Set cookie for Next.js server requests and middleware
   document.cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+
+  // Dispatch auth state change notification for active client components
+  window.dispatchEvent(new Event("taxaihelp-auth-change"));
 }
 
 /**
@@ -55,6 +58,9 @@ export async function clearSession(): Promise<void> {
   } catch (_err) {
     // Ignore server network error on logout
   }
+
+  // Dispatch auth state change notification for active client components
+  window.dispatchEvent(new Event("taxaihelp-auth-change"));
 }
 
 /**

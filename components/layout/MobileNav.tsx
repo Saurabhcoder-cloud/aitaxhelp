@@ -2,16 +2,24 @@
 
 import React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { MAIN_NAV_ITEMS } from "../../lib/constants/navigation";
 import { Button } from "../ui/Button";
+import { ClientUserSession } from "../../lib/utils/auth-client";
+import { LogOut, User, ShieldCheck } from "lucide-react";
 
 interface MobileNavProps {
   isOpen: boolean;
   onClose: () => void;
+  session?: ClientUserSession | null;
+  onSignOut?: () => Promise<void>;
 }
 
-export function MobileNav({ isOpen, onClose }: MobileNavProps) {
+export function MobileNav({ isOpen, onClose, session, onSignOut }: MobileNavProps) {
+  const pathname = usePathname();
   if (!isOpen) return null;
+
+  const isAuthenticated = Boolean(session && session.id);
 
   return (
     <div className="fixed inset-0 z-50 lg:hidden">
@@ -74,28 +82,82 @@ export function MobileNav({ isOpen, onClose }: MobileNavProps) {
                 )}
               </div>
             ))}
-            <div className="pt-2 border-t border-surface-100 flex flex-col space-y-2">
-              <Link
-                href="/dashboard"
-                onClick={onClose}
-                className="font-semibold text-brand-700 hover:text-brand-900 transition-colors text-base"
-              >
-                Dashboard &amp; Settings →
-              </Link>
-              <Link
-                href="/login"
-                onClick={onClose}
-                className="text-sm font-medium text-surface-600 hover:text-surface-900 transition-colors"
-              >
-                Sign In / Account
-              </Link>
+
+            {/* Auth-Aware Navigation Links */}
+            <div className="pt-3 border-t border-surface-100 flex flex-col space-y-2.5">
+              {isAuthenticated ? (
+                <>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-surface-400 flex items-center gap-1.5 mb-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Taxpayer Account</span>
+                  </div>
+                  <Link
+                    href="/dashboard"
+                    onClick={onClose}
+                    className={`flex items-center gap-2 font-semibold transition-colors text-base ${
+                      pathname === "/dashboard" || pathname.startsWith("/dashboard/")
+                        ? "text-brand-600"
+                        : "text-brand-700 hover:text-brand-900"
+                    }`}
+                  >
+                    <User className="w-4 h-4 text-brand-600" />
+                    <span>Dashboard &amp; Settings</span>
+                  </Link>
+                  <Link
+                    href="/dashboard/taxes"
+                    onClick={onClose}
+                    className="text-sm font-medium text-surface-700 hover:text-brand-600 transition-colors pl-6"
+                  >
+                    Start / Continue Taxes
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (onSignOut) {
+                        await onSignOut();
+                      }
+                      onClose();
+                    }}
+                    className="flex items-center gap-2 text-sm font-medium text-surface-600 hover:text-red-600 transition-colors text-left pt-1 cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4 text-surface-400" />
+                    <span>Sign Out</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    onClick={onClose}
+                    className={`font-semibold transition-colors text-base ${
+                      pathname === "/login"
+                        ? "text-brand-600 font-bold"
+                        : "text-brand-700 hover:text-brand-900"
+                    }`}
+                  >
+                    Sign In →
+                  </Link>
+                  <Link
+                    href="/signup"
+                    onClick={onClose}
+                    className="text-sm font-medium text-surface-600 hover:text-surface-900 transition-colors"
+                  >
+                    Create Account
+                  </Link>
+                </>
+              )}
             </div>
           </nav>
         </div>
 
         {/* Footer CTAs */}
         <div className="mt-8 pt-6 border-t border-surface-200 flex flex-col space-y-3">
-          <Button href="/tax-calculators" onClick={onClose} size="md" className="w-full">
+          <Button
+            href={isAuthenticated ? "/dashboard/taxes" : "/login?next=/dashboard/taxes"}
+            onClick={onClose}
+            size="md"
+            className="w-full font-medium shadow-sm"
+          >
             Calculate Your Taxes
           </Button>
           <Button
@@ -103,7 +165,7 @@ export function MobileNav({ isOpen, onClose }: MobileNavProps) {
             onClick={onClose}
             variant="outline"
             size="md"
-            className="w-full"
+            className="w-full font-medium"
           >
             Ask AI Assistant
           </Button>

@@ -118,7 +118,7 @@ export default function AdminOperationsPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 text-surface-100">
+    <div className="bg-surface-950 rounded-2xl p-6 sm:p-8 border border-surface-800 shadow-xl space-y-6 text-surface-100">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-surface-800 gap-4">
         <div>

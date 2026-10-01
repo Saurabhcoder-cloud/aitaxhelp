@@ -48,9 +48,19 @@ export default function StartMyTaxesPage() {
     if (!result.success) {
       setError(result.error || "Unable to load your preparation session.");
       setSession(null);
-    } else {
+    } else if (result.data) {
       setError(null);
-      setSession(result.data ?? null);
+      setSession(result.data);
+    } else {
+      // If no active session exists, start the canonical preparation session workflow
+      const startResult = await startPreparationSession();
+      if (startResult.success && startResult.data) {
+        setError(null);
+        setSession(startResult.data);
+      } else {
+        setError(null);
+        setSession(null);
+      }
     }
     setIsLoading(false);
   }, []);

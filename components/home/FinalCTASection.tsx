@@ -2,6 +2,7 @@ import React from "react";
 import { Container } from "../ui/Container";
 import { Section } from "../ui/Section";
 import { Button } from "../ui/Button";
+import { ArrowRight, Calculator } from "lucide-react";
 
 export function FinalCTASection() {
   return (
@@ -16,20 +17,22 @@ export function FinalCTASection() {
 
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
           <Button
-            href="/tax-calculators"
+            href="/dashboard/taxes"
             size="lg"
-            className="w-full sm:w-auto shadow-lg"
+            className="w-full sm:w-auto shadow-lg font-semibold px-7"
           >
-            Calculate Your Taxes
+            <span>Start My Taxes</span>
+            <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
 
           <Button
-            href="/ai-tax-assistant"
-            variant="outline"
+            href="/tax-calculators"
+            variant="outline-dark"
             size="lg"
-            className="w-full sm:w-auto border-surface-700 text-white hover:bg-navy-800"
+            className="w-full sm:w-auto font-medium px-6"
           >
-            Ask the AI Tax Assistant
+            <Calculator className="w-4 h-4 mr-2 text-surface-300" />
+            <span>Explore Tax Calculators</span>
           </Button>
         </div>
 

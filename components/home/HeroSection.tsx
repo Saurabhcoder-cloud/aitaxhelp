@@ -3,71 +3,66 @@ import Link from "next/link";
 import { Container } from "../ui/Container";
 import { Button } from "../ui/Button";
 import { Badge } from "../ui/Badge";
+import { ArrowRight, Calculator } from "lucide-react";
 
 export function HeroSection() {
   return (
-    <div className="relative overflow-hidden bg-gradient-to-b from-surface-50 via-white to-surface-50/50 pt-16 pb-20 sm:pt-24 sm:pb-28 border-b border-surface-200">
-      {/* Background radial accent */}
+    <div className="relative overflow-hidden bg-gradient-to-b from-surface-50 via-white to-surface-50/50 pt-8 pb-12 sm:pt-12 sm:pb-16 lg:pt-14 lg:pb-16 border-b border-surface-200">
+      {/* Subtle background radial accent */}
       <div
-        className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-brand-200/40 blur-[120px] rounded-full -z-10"
+        className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[600px] h-[320px] bg-brand-200/30 blur-[100px] rounded-full -z-10"
         aria-hidden="true"
       />
 
       <Container size="xl" className="text-center">
-        {/* Top Trust Pill */}
-        <div className="inline-flex items-center gap-2 mb-6">
-          <Badge variant="brand" size="md" className="py-1 px-3">
-            <span className="w-2 h-2 rounded-full bg-brand-500 mr-1.5 animate-pulse" />
-            2025 / 2026 Federal Tax Engine
-          </Badge>
-          <span className="text-xs font-semibold text-surface-600 hidden sm:inline">
-            IRS IRB 2025-45 & Rev. Proc. 2025-32 Verified
-          </span>
-        </div>
-
         {/* Main Headline */}
-        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black text-surface-900 tracking-tight leading-[1.1] max-w-4xl mx-auto">
-          Smarter Tax Help, <br className="hidden sm:inline" />
+        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-surface-900 tracking-tight leading-[1.15] max-w-4xl mx-auto">
+          Smarter Tax Help,{" "}
           <span className="bg-gradient-to-r from-brand-600 to-navy-900 bg-clip-text text-transparent">
             Powered by AI
           </span>
         </h1>
 
         {/* Supporting Message */}
-        <p className="mt-6 text-lg sm:text-xl text-surface-700 max-w-2xl mx-auto leading-relaxed">
-          TaxAIHelp helps individual taxpayers, freelancers, 1099 contractors, and small businesses understand their federal tax situations through deterministic calculators, educational resources, and AI-assisted guidance.
+        <p className="mt-4 sm:mt-5 text-base sm:text-lg lg:text-xl text-surface-700 max-w-2xl mx-auto leading-relaxed">
+          Understand your federal taxes, identify eligible deductions, and receive clear explanations through a guided tax preparation experience. Powered by deterministic calculations and verified IRS formulas.
         </p>
 
         {/* Primary and Secondary CTAs */}
-        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+        <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-center gap-3.5">
           <Button
-            href="/tax-calculators"
+            href="/dashboard/taxes"
             size="lg"
-            className="w-full sm:w-auto shadow-md hover:shadow-lg transition-all"
+            className="w-full sm:w-auto shadow-md hover:shadow-lg transition-all font-semibold px-7"
           >
-            Calculate Your Taxes
-            <svg
-              className="w-4 h-4 ml-2"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-            </svg>
+            <span>Start My Taxes</span>
+            <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
 
           <Button
-            href="/ai-tax-assistant"
+            href="/tax-calculators"
             variant="outline"
             size="lg"
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto font-medium px-6"
           >
-            Ask the AI Tax Assistant
+            <Calculator className="w-4 h-4 mr-2 text-surface-600" />
+            <span>Explore Tax Calculators</span>
           </Button>
         </div>
 
+        {/* Trust / Verification Information (Below CTAs) */}
+        <div className="mt-6 sm:mt-7 flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+          <Badge variant="brand" size="md" className="py-1 px-3 font-medium">
+            <span className="w-2 h-2 rounded-full bg-brand-500 mr-1.5 animate-pulse" />
+            2025 / 2026 Federal Tax Engine
+          </Badge>
+          <span className="text-xs font-semibold text-surface-600">
+            IRS IRB 2025-45 &amp; Rev. Proc. 2025-32 Verified
+          </span>
+        </div>
+
         {/* Core Pillars / Value Badges */}
-        <div className="mt-16 pt-10 border-t border-surface-200/80 grid grid-cols-2 md:grid-cols-4 gap-6 text-left max-w-5xl mx-auto">
+        <div className="mt-10 sm:mt-12 pt-8 border-t border-surface-200/80 grid grid-cols-2 md:grid-cols-4 gap-5 text-left max-w-5xl mx-auto">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -87,7 +82,7 @@ export function HeroSection() {
               </svg>
             </div>
             <div>
-              <h4 className="text-sm font-bold text-surface-900">1099 & Schedule SE</h4>
+              <h4 className="text-sm font-bold text-surface-900">1099 &amp; Schedule SE</h4>
               <p className="text-xs text-surface-600 mt-0.5">Self-employment tax and deductible expense models</p>
             </div>
           </div>

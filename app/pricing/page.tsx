@@ -181,7 +181,7 @@ export default function PricingPage() {
         <div className="max-w-2xl mx-auto p-4 rounded-2xl bg-purple-50 border border-purple-200 text-xs text-purple-900 flex items-start gap-3">
           <Info className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
           <div>
-            <strong>Stripe Payments (Test Mode Architecture):</strong> Card processing and subscription checkouts are handled securely via server-side Stripe architecture. Core deterministic tax calculators remain fully functional and free of charge.
+            <strong>Secure Payment Processing:</strong> Card processing and subscription checkouts are handled securely via Stripe. Core deterministic tax calculators remain fully functional and free of charge.
           </div>
         </div>
 

@@ -163,10 +163,10 @@ export default function DashboardOverviewPage() {
           <Button href="/dashboard/taxes" size="sm" className="bg-white text-navy-950 hover:bg-surface-100 font-semibold shadow-sm">
             Start My Taxes
           </Button>
-          <Button href="/tax-calculators" size="sm" variant="outline" className="border-surface-600 text-white hover:bg-navy-800">
+          <Button href="/tax-calculators" size="sm" variant="outline-dark">
             Run Calculation
           </Button>
-          <Button href="/ai-tax-assistant" variant="outline" size="sm" className="border-surface-600 text-white hover:bg-navy-800">
+          <Button href="/ai-tax-assistant" variant="outline-dark" size="sm">
             Ask AI Assistant
           </Button>
         </div>

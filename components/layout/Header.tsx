@@ -1,23 +1,74 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import { MAIN_NAV_ITEMS } from "../../lib/constants/navigation";
 import { Button } from "../ui/Button";
 import { Badge } from "../ui/Badge";
 import { MobileNav } from "./MobileNav";
+import { checkSession, signOut, ClientUserSession } from "../../lib/utils/auth-client";
+import { LogOut, User } from "lucide-react";
 
 export function Header() {
+  const router = useRouter();
+  const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
+  const [session, setSession] = useState<ClientUserSession | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAuth() {
+      try {
+        const user = await checkSession();
+        if (isMounted) {
+          setSession(user);
+          setIsAuthLoading(false);
+        }
+      } catch (_err) {
+        if (isMounted) {
+          setSession(null);
+          setIsAuthLoading(false);
+        }
+      }
+    }
+
+    loadAuth();
+
+    const handleAuthEvent = () => {
+      loadAuth();
+    };
+
+    window.addEventListener("taxaihelp-auth-change", handleAuthEvent);
+    window.addEventListener("storage", handleAuthEvent);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener("taxaihelp-auth-change", handleAuthEvent);
+      window.removeEventListener("storage", handleAuthEvent);
+    };
+  }, []);
+
+  const handleSignOut = async () => {
+    await signOut();
+    setSession(null);
+    router.push("/");
+    router.refresh();
+  };
+
+  const isAuthenticated = Boolean(!isAuthLoading && session && session.id);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-surface-200/80 bg-white/95 backdrop-blur-md transition-all">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Brand Logo */}
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-6 xl:gap-8 flex-shrink-0">
           <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-600 to-navy-900 flex items-center justify-center text-white font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-600 to-navy-900 flex items-center justify-center text-white font-bold text-lg shadow-sm group-hover:scale-105 transition-transform flex-shrink-0">
               <svg
                 className="w-5 h-5"
                 viewBox="0 0 24 24"
@@ -31,17 +82,17 @@ export function Header() {
               </svg>
             </div>
             <div className="flex flex-col">
-              <span className="font-extrabold text-xl tracking-tight text-surface-900 leading-tight">
+              <span className="font-extrabold text-xl tracking-tight text-surface-900 leading-tight whitespace-nowrap">
                 TaxAI<span className="text-brand-600">Help</span>
               </span>
-              <span className="text-[10px] uppercase font-bold tracking-wider text-surface-600 hidden sm:inline">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-surface-600 hidden sm:inline whitespace-nowrap">
                 US Tax Intelligence
               </span>
             </div>
           </Link>
 
           {/* Desktop Nav Items */}
-          <nav className="hidden lg:flex items-center space-x-1" aria-label="Main Navigation">
+          <nav className="hidden lg:flex items-center space-x-0.5 xl:space-x-1" aria-label="Main Navigation">
             {MAIN_NAV_ITEMS.map((item) => (
               <div
                 key={item.title}
@@ -51,17 +102,17 @@ export function Header() {
               >
                 <Link
                   href={item.href}
-                  className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium text-surface-700 hover:text-surface-900 hover:bg-surface-50 rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 xl:px-3 py-2 text-xs xl:text-sm font-medium text-surface-700 hover:text-surface-900 hover:bg-surface-50 rounded-lg transition-colors whitespace-nowrap"
                 >
-                  {item.title}
+                  <span>{item.title}</span>
                   {item.badge && (
-                    <Badge variant="brand" size="sm">
+                    <Badge variant="brand" size="sm" className="whitespace-nowrap text-[10px] py-0 px-1.5">
                       {item.badge}
                     </Badge>
                   )}
                   {item.children && (
                     <svg
-                      className="w-3.5 h-3.5 text-surface-400"
+                      className="w-3.5 h-3.5 text-surface-400 flex-shrink-0"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -103,29 +154,64 @@ export function Header() {
         </div>
 
         {/* Right CTA Area */}
-        <div className="flex items-center gap-3">
-          <Link
-            href="/dashboard"
-            className="hidden xl:inline-flex items-center gap-1.5 text-xs font-semibold text-surface-700 hover:text-brand-600 px-2.5 py-1.5 rounded-lg hover:bg-surface-50 transition-colors"
-          >
-            Dashboard
-          </Link>
+        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+          {isAuthenticated ? (
+            /* Authenticated Navigation Items */
+            <>
+              <Link
+                href="/dashboard"
+                className={`hidden md:inline-flex items-center gap-1.5 text-xs xl:text-sm font-semibold px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
+                  pathname === "/dashboard" || pathname.startsWith("/dashboard/")
+                    ? "text-brand-600 bg-brand-50"
+                    : "text-surface-700 hover:text-brand-600 hover:bg-surface-50"
+                }`}
+              >
+                <User className="w-3.5 h-3.5 text-surface-400" />
+                <span>Dashboard</span>
+              </Link>
 
-          <Link
-            href="/ai-tax-assistant"
-            className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold text-surface-700 hover:text-brand-600 px-3 py-2 rounded-lg hover:bg-surface-50 transition-colors"
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Try AI Tax Help
-          </Link>
+              <Button
+                href="/dashboard/taxes"
+                size="sm"
+                className="hidden sm:inline-flex shadow-sm whitespace-nowrap font-medium"
+              >
+                Calculate Your Taxes
+              </Button>
 
-          <Button
-            href="/tax-calculators"
-            size="sm"
-            className="hidden sm:inline-flex shadow-sm"
-          >
-            Calculate Your Taxes
-          </Button>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="hidden md:inline-flex items-center gap-1 text-xs font-medium text-surface-500 hover:text-surface-900 px-2 py-1.5 rounded-lg hover:bg-surface-100 transition-colors whitespace-nowrap cursor-pointer"
+                title="Sign out of current account"
+                aria-label="Sign out"
+              >
+                <LogOut className="w-3.5 h-3.5 text-surface-400" />
+                <span>Sign Out</span>
+              </button>
+            </>
+          ) : (
+            /* Unauthenticated Navigation Items (also rendered during SSR/hydration to prevent flash) */
+            <>
+              <Link
+                href="/login"
+                className={`hidden sm:inline-flex items-center text-xs xl:text-sm font-semibold px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
+                  pathname === "/login"
+                    ? "text-brand-600 bg-brand-50"
+                    : "text-surface-700 hover:text-brand-600 hover:bg-surface-50"
+                }`}
+              >
+                Sign In
+              </Link>
+
+              <Button
+                href="/login?next=/dashboard/taxes"
+                size="sm"
+                className="hidden sm:inline-flex shadow-sm whitespace-nowrap font-medium"
+              >
+                Calculate Your Taxes
+              </Button>
+            </>
+          )}
 
           {/* Mobile hamburger button */}
           <button
@@ -155,6 +241,8 @@ export function Header() {
       <MobileNav
         isOpen={mobileMenuOpen}
         onClose={() => setMobileMenuOpen(false)}
+        session={session}
+        onSignOut={handleSignOut}
       />
     </header>
   );
