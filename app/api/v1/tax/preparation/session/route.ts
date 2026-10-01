@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth/session";
-import { TaxPreparationSessionStore } from "@/lib/services/tax-preparation-session-store";
+import {
+  TaxPreparationSessionStore,
+  TaxPreparationSession,
+} from "@/lib/services/tax-preparation-session-store";
 import {
   startPreparationSessionSchema,
   updatePreparationProgressSchema,
@@ -57,7 +60,14 @@ export async function PATCH(req: NextRequest) {
     const user = await requireUser(req);
     const rawBody = await readJson(req);
     const validated = updatePreparationProgressSchema.parse(rawBody);
-    const session = await TaxPreparationSessionStore.updateProgress(user.id, validated.completeStep);
+    let session: TaxPreparationSession;
+    if (validated.completeStep) {
+      session = await TaxPreparationSessionStore.updateProgress(user.id, validated.completeStep);
+    } else if (validated.navigateToStep) {
+      session = await TaxPreparationSessionStore.navigateToStep(user.id, validated.navigateToStep);
+    } else {
+      throw new AppError("Invalid step update request.", 400, "BAD_REQUEST");
+    }
     return NextResponse.json({
       success: true,
       data: session,

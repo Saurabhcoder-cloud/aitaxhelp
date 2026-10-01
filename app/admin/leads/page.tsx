@@ -70,14 +70,24 @@ export default function AdminLeadsPage() {
 
   const getStatusBadge = (status: ProfessionalLeadStatus) => {
     switch (status) {
+      case "requested":
       case "new":
-        return <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">New</span>;
+        return <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">Requested</span>;
+      case "received":
+        return <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-50 text-amber-700 border border-amber-200">Received</span>;
+      case "assigned":
+        return <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-50 text-purple-700 border border-purple-200">Assigned</span>;
       case "contacted":
-        return <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-50 text-amber-700 border border-amber-200">Contacted</span>;
+        return <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200">Contacted</span>;
       case "in_progress":
-        return <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-50 text-purple-700 border border-purple-200">In Progress</span>;
+      case "review_in_progress":
+        return <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">In Review</span>;
+      case "completed":
+        return <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Completed</span>;
       case "closed":
         return <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-surface-100 text-surface-700 border border-surface-200">Closed</span>;
+      case "cancelled":
+        return <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-50 text-red-700 border border-red-200">Cancelled</span>;
       default:
         return <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-surface-100 text-surface-700">{status}</span>;
     }
@@ -207,7 +217,18 @@ export default function AdminLeadsPage() {
                 {leads.map((lead) => (
                   <tr key={lead.id} className="hover:bg-surface-50/80 transition-colors">
                     <td className="px-5 py-4">
-                      <div className="font-semibold text-surface-900">{lead.taxpayerName}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-surface-900">{lead.taxpayerName}</span>
+                        {lead.reviewType && (
+                          <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-purple-100 text-purple-800">
+                            {lead.reviewType === "cpa"
+                              ? "CPA"
+                              : lead.reviewType === "enrolled_agent"
+                              ? "EA"
+                              : "PRO"}
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-surface-500 flex items-center gap-1.5 mt-0.5">
                         <Mail className="w-3 h-3 text-surface-400" />
                         <span>{lead.email}</span>
@@ -222,18 +243,23 @@ export default function AdminLeadsPage() {
                     <td className="px-4 py-4">
                       <div className="font-medium text-surface-900">Tax Year {lead.taxYear}</div>
                       <div className="text-xs text-surface-500 capitalize">{lead.filingStatus.replace(/_/g, " ")}</div>
-                      {lead.calculationId ? (
-                        <Link
-                          href={`/admin/calculations/${lead.calculationId}`}
-                          className="text-xs text-brand-600 hover:text-brand-700 inline-flex items-center gap-1 mt-1 font-mono"
-                          title="Inspect linked calculation snapshot"
-                        >
-                          <span>Calc ID: {lead.calculationId.slice(0, 8)}...</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </Link>
-                      ) : (
-                        <span className="text-xs text-surface-400 mt-1 block">General Inquiry</span>
-                      )}
+                      <div className="space-y-0.5 mt-1 font-mono text-[11px]">
+                        {lead.calculationId && (
+                          <Link
+                            href={`/admin/calculations/${lead.calculationId}`}
+                            className="text-brand-600 hover:text-brand-700 inline-flex items-center gap-1"
+                            title="Inspect linked calculation snapshot"
+                          >
+                            <span>Calc: {lead.calculationId.slice(0, 8)}...</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </Link>
+                        )}
+                        {lead.sessionId && (
+                          <div className="text-surface-500 text-[10px]">
+                            Session: {lead.sessionId.slice(0, 8)}...
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-4">
                       <div className="text-xs font-medium text-surface-800 capitalize">
@@ -243,7 +269,14 @@ export default function AdminLeadsPage() {
                         via {lead.preferredContactMethod}
                       </div>
                     </td>
-                    <td className="px-4 py-4">{getStatusBadge(lead.status)}</td>
+                    <td className="px-4 py-4">
+                      <div>{getStatusBadge(lead.status)}</div>
+                      {lead.assignedProfessionalName && (
+                        <div className="text-[11px] text-purple-700 font-medium mt-1 truncate max-w-[130px]" title={lead.assignedProfessionalName}>
+                          Pro: {lead.assignedProfessionalName}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-4 text-xs text-surface-500">
                       {new Date(lead.createdAt).toLocaleDateString()}
                     </td>

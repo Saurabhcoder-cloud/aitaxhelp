@@ -164,10 +164,10 @@ export default function AdminSubscriptionsPage() {
             <table className="w-full text-left text-sm text-surface-700">
               <thead className="bg-surface-50 text-surface-500 text-xs uppercase font-semibold border-b border-surface-200">
                 <tr>
-                  <th scope="col" className="px-5 py-3.5">User</th>
+                  <th scope="col" className="px-5 py-3.5">User & Subscription</th>
+                  <th scope="col" className="px-4 py-3.5">Stripe IDs</th>
                   <th scope="col" className="px-4 py-3.5">Plan Tier</th>
                   <th scope="col" className="px-4 py-3.5">Status</th>
-                  <th scope="col" className="px-4 py-3.5">Provider</th>
                   <th scope="col" className="px-4 py-3.5">Period End</th>
                   <th scope="col" className="px-4 py-3.5">Created</th>
                 </tr>
@@ -180,24 +180,63 @@ export default function AdminSubscriptionsPage() {
                         href={`/admin/users/${s.userId}`}
                         className="font-medium text-brand-600 hover:underline flex items-center gap-1.5 text-xs font-mono"
                       >
-                        <span>User: {s.userId.slice(0, 12)}...</span>
+                        <span>User: {s.userId.slice(0, 10)}...</span>
                         <ExternalLink className="w-3 h-3" />
                       </Link>
+                      <div className="text-[10px] font-mono text-surface-400 mt-0.5">
+                        Sub: {s.id.slice(0, 10)}...
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5 text-xs font-mono text-surface-600 space-y-0.5">
+                      <div>
+                        {s.providerCustomerId ? (
+                          <span className="text-[11px] text-surface-700 bg-surface-100 px-1.5 py-0.5 rounded">
+                            {s.providerCustomerId.slice(0, 14)}...
+                          </span>
+                        ) : (
+                          <span className="text-surface-400 text-[10px]">No Customer</span>
+                        )}
+                      </div>
+                      {s.providerSubscriptionId && (
+                        <div className="text-[10px] text-surface-500">
+                          {s.providerSubscriptionId.slice(0, 14)}...
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3.5 text-xs font-bold capitalize">
-                      {s.planId === "premium" ? (
-                        <span className="text-purple-700">Premium</span>
+                      {s.planId === "professional" ? (
+                        <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          Professional
+                        </span>
+                      ) : s.planId === "premium" ? (
+                        <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200">
+                          Premium
+                        </span>
                       ) : (
-                        <span className="text-surface-600">Free</span>
+                        <span className="text-surface-500">Free</span>
                       )}
                     </td>
                     <td className="px-4 py-3.5 text-xs">
-                      <span className="px-2 py-0.5 rounded-full font-semibold capitalize bg-surface-100 text-surface-700">
+                      <span
+                        className={`px-2 py-0.5 rounded-full font-semibold capitalize text-[11px] ${
+                          s.status === "active"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : s.status === "trialing"
+                            ? "bg-blue-50 text-blue-700 border border-blue-200"
+                            : s.status === "past_due"
+                            ? "bg-amber-50 text-amber-700 border border-amber-200 font-bold"
+                            : s.status === "canceled"
+                            ? "bg-surface-100 text-surface-600"
+                            : "bg-surface-100 text-surface-700"
+                        }`}
+                      >
                         {s.status}
                       </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-xs uppercase font-mono text-surface-500">
-                      {s.provider}
+                      {s.cancelAtPeriodEnd && (
+                        <div className="text-[10px] text-amber-700 font-medium mt-0.5">
+                          Cancels at end
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3.5 text-xs text-surface-600">
                       {new Date(s.currentPeriodEnd).toLocaleDateString()}

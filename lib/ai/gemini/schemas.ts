@@ -34,6 +34,13 @@ export const aiAssistantRequestSchema = z
       .max(64)
       .regex(/^[a-zA-Z0-9_-]+$/, "Invalid conversation ID format")
       .optional(),
+    sessionId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(64)
+      .regex(/^[a-zA-Z0-9_-]+$/, "Invalid session ID format")
+      .optional(),
     // Client may attempt to supply userId or context, but server strictly ignores userId
     userId: z.string().optional(),
     context: z.record(z.unknown()).optional(),

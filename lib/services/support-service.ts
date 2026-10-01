@@ -112,17 +112,50 @@ export class SupportService {
       requestId: params.requestId,
     });
 
-    // In-App Notification confirmation to user
+    // Audit logging for support escalation
     try {
-      await NotificationService.dispatchNotification({
+      await AuditLogStore.log({
         userId: params.userId,
+        action: "support_escalation_created",
+        targetType: "support_ticket",
+        targetId: ticket.id,
+        metadata: {
+          ticketNumber: ticket.ticketNumber,
+          category: ticket.category,
+          priority: ticket.priority,
+          hasSessionId: !!params.safeContext?.sessionId,
+        },
+      });
+    } catch (_err) {
+      // Non-blocking audit log
+    }
+
+    // Dispatch safe user notification
+    try {
+      const template = NotificationTemplates.supportTicketCreated({
+        ticketNumber: ticket.ticketNumber,
+        subject: ticket.subject,
+        ticketId: ticket.id,
+        siteUrl: process.env.NEXT_PUBLIC_SITE_URL || "https://taxaihelp.com",
+      });
+
+      await NotificationService.dispatchNotification({
+        userId: ticket.userId,
         category: "support",
         type: "support_ticket_created",
         title: `Support Ticket Received: ${ticket.ticketNumber}`,
-        message: `Your support request "${ticket.subject}" has been received. Our team will review it shortly.`,
+        message: `Your support request "${ticket.subject}" (${ticket.ticketNumber}) has been received. Our team will review it shortly.`,
         actionUrl: `/dashboard/support/${ticket.id}`,
         actionLabel: "View Ticket",
-        idempotencyKey: `support_create_${ticket.id}`,
+        emailRecipient: ticket.userEmail,
+        emailSubject: template.subject,
+        emailText: template.text,
+        emailHtml: template.html,
+        idempotencyKey: `ticket_created_notif_${ticket.id}`,
+        metadata: {
+          ticketId: ticket.id,
+          ticketNumber: ticket.ticketNumber,
+        },
       });
     } catch (_err) {
       // Non-blocking notification dispatch

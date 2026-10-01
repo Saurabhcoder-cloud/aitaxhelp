@@ -4,12 +4,42 @@ import { DocumentsSnapshot } from "@/lib/preparation/documents";
 import { DeductionDiscovery, deductionExpenseCents, incomeSupportsBusinessExpenses } from "@/lib/preparation/deductions";
 import { isCompleteDeductionDiscovery } from "@/lib/validations/preparation-deductions";
 import { PreparationProfileSnapshot, PreparationStep, PreparationStepMap, PREPARATION_STEPS } from "@/lib/preparation/steps";
+import { TaxCalculationResult, CalculatorType, TaxWarning } from "@/types/tax";
 
 export interface CalculationReadiness {
   ready: boolean;
   missing: string[];
   warnings: string[];
   errors: string[];
+}
+
+export interface TaxSituationSummaryCalculation {
+  calculationId: string;
+  calculatorType: CalculatorType;
+  engineVersion: string;
+  rulesVersion: string;
+  calculatedAt: string;
+  totalIncomeCents: number;
+  grossIncomeCents: number;
+  adjustedGrossIncomeCents: number;
+  taxableIncomeCents: number;
+  deductionUsedCents: number;
+  deductionType: "standard";
+  federalIncomeTaxCents: number;
+  selfEmploymentTaxCents: number;
+  totalTaxLiabilityCents: number;
+  totalPaymentsAndWithholdingCents: number;
+  estimatedRefundCents: number;
+  estimatedAmountOwedCents: number;
+  effectiveTaxRate: number;
+  marginalTaxBracket: number;
+  refundOrBalanceDue: {
+    type: "refund" | "balance_due" | "zero";
+    amountCents: number;
+    estimatedRefundCents: number;
+    estimatedAmountOwedCents: number;
+  };
+  warnings: TaxWarning[];
 }
 
 export interface TaxSituationSummary {
@@ -31,8 +61,23 @@ export interface TaxSituationSummary {
     currentStep: PreparationStep;
     completedSteps: PreparationStep[];
   };
-  calculationStatus: "ready" | "not_ready";
+  calculationStatus: "ready" | "not_ready" | "calculated";
   readiness: CalculationReadiness;
+
+  // Actual calculation results populated once calculation is executed
+  calculationId?: string | null;
+  calculation?: TaxSituationSummaryCalculation | null;
+  totalIncomeCents?: number;
+  taxableIncomeCents?: number;
+  deductionsCents?: number;
+  federalWithholdingCents?: number;
+  estimatedFederalTaxCents?: number;
+  refundOrBalanceDue?: {
+    type: "refund" | "balance_due" | "zero";
+    amountCents: number;
+    estimatedRefundCents: number;
+    estimatedAmountOwedCents: number;
+  };
 }
 
 export function assessCalculationReadiness(input: {
@@ -94,6 +139,8 @@ export function buildTaxSituationSummary(input: {
   income: IncomeDiscovery;
   documents: DocumentsSnapshot;
   deductions: DeductionDiscovery;
+  calculationSnapshot?: TaxCalculationResult | null;
+  calculationId?: string | null;
 }): TaxSituationSummary {
   const w2WagesCents = input.income.w2s.reduce((sum, entry) => sum + entry.wagesCents, 0);
   const form1099GrossCents = input.income.form1099s.reduce((sum, entry) => sum + entry.grossIncomeCents, 0);
@@ -115,6 +162,67 @@ export function buildTaxSituationSummary(input: {
 
   const readiness = assessCalculationReadiness(input);
 
+  const calc = input.calculationSnapshot;
+  let calculationDetails: TaxSituationSummaryCalculation | null = null;
+  let calculationStatus: "ready" | "not_ready" | "calculated" = readiness.ready ? "ready" : "not_ready";
+
+  const allWarnings = [...readiness.warnings];
+
+  if (calc) {
+    calculationStatus = "calculated";
+    const isRefund = calc.estimatedRefundCents > 0;
+    const isOwed = calc.estimatedAmountOwedCents > 0;
+    const refundOrBalanceDue = {
+      type: isRefund ? ("refund" as const) : isOwed ? ("balance_due" as const) : ("zero" as const),
+      amountCents: isRefund ? calc.estimatedRefundCents : calc.estimatedAmountOwedCents,
+      estimatedRefundCents: calc.estimatedRefundCents,
+      estimatedAmountOwedCents: calc.estimatedAmountOwedCents,
+    };
+
+    calculationDetails = {
+      calculationId: input.calculationId || calc.calculationId,
+      calculatorType: calc.calculatorType,
+      engineVersion: calc.engineVersion,
+      rulesVersion: calc.rulesVersion,
+      calculatedAt: calc.calculatedAt,
+      totalIncomeCents: calc.grossIncomeCents,
+      grossIncomeCents: calc.grossIncomeCents,
+      adjustedGrossIncomeCents: calc.adjustedGrossIncomeCents,
+      taxableIncomeCents: calc.taxableIncomeCents,
+      deductionUsedCents: calc.deductionUsedCents,
+      deductionType: calc.deductionType,
+      federalIncomeTaxCents: calc.federalIncomeTaxCents,
+      selfEmploymentTaxCents: calc.selfEmploymentTaxCents,
+      totalTaxLiabilityCents: calc.totalTaxLiabilityCents,
+      totalPaymentsAndWithholdingCents: calc.totalPaymentsAndWithholdingCents,
+      estimatedRefundCents: calc.estimatedRefundCents,
+      estimatedAmountOwedCents: calc.estimatedAmountOwedCents,
+      effectiveTaxRate: calc.effectiveTaxRate,
+      marginalTaxBracket: calc.marginalTaxBracket,
+      refundOrBalanceDue,
+      warnings: calc.warnings,
+    };
+
+    for (const w of calc.warnings) {
+      if (!allWarnings.includes(w.message)) {
+        allWarnings.push(w.message);
+      }
+    }
+  }
+
+  const informationReceived = [
+    ...(input.profile.fullName ? [`Profile for ${input.profile.fullName}`] : []),
+    ...incomeSources,
+    ...documentsReceived.map((name) => `${name} recorded as received`),
+    ...(input.deductions.saved && input.deductions.hasBusinessExpenses
+      ? ["Business expenses entered"]
+      : []),
+    ...(input.deductions.saved && input.deductions.standardDeductionAcknowledged
+      ? ["Standard deduction will be used by the tax engine"]
+      : []),
+    ...(calc ? ["Deterministic federal tax calculation completed"] : []),
+  ];
+
   return {
     taxYear: input.taxYear,
     taxpayerName: input.profile.fullName,
@@ -127,24 +235,22 @@ export function buildTaxSituationSummary(input: {
       expenseCents,
     },
     documentsReceived,
-    informationReceived: [
-      ...(input.profile.fullName ? [`Profile for ${input.profile.fullName}`] : []),
-      ...incomeSources,
-      ...documentsReceived.map((name) => `${name} recorded as received`),
-      ...(input.deductions.saved && input.deductions.hasBusinessExpenses
-        ? ["Business expenses entered"]
-        : []),
-      ...(input.deductions.saved && input.deductions.standardDeductionAcknowledged
-        ? ["Standard deduction will be used by the tax engine"]
-        : []),
-    ],
+    informationReceived,
     informationStillNeeded: readiness.missing,
-    warnings: readiness.warnings,
+    warnings: allWarnings,
     progress: {
       currentStep: input.currentStep,
       completedSteps: PREPARATION_STEPS.filter((step) => input.steps[step] === "completed"),
     },
-    calculationStatus: readiness.ready ? "ready" : "not_ready",
+    calculationStatus,
     readiness,
+    calculationId: input.calculationId || calc?.calculationId || null,
+    calculation: calculationDetails,
+    totalIncomeCents: calc?.grossIncomeCents,
+    taxableIncomeCents: calc?.taxableIncomeCents,
+    deductionsCents: calc?.deductionUsedCents,
+    federalWithholdingCents: calc?.totalPaymentsAndWithholdingCents,
+    estimatedFederalTaxCents: calc?.totalTaxLiabilityCents,
+    refundOrBalanceDue: calculationDetails?.refundOrBalanceDue,
   };
 }

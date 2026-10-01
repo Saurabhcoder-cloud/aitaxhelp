@@ -70,6 +70,41 @@ export const PRODUCT_PLANS: Record<PlanId, ProductPlan> = {
       "professional.handoff",
     ],
   },
+  professional: {
+    id: "professional",
+    name: "Professional / Tax Prep",
+    tagline: "Unlimited AI, Direct CPA Review Credit & Priority Support",
+    description:
+      "All Premium capabilities plus priority CPA/EA triage, unlimited AI messages, and preparation session consultation credit.",
+    monthlyPriceCents: 4900, // $49.00 / month
+    annualPriceCents: 39900, // $399.00 / year (save ~32%)
+    currency: "USD",
+    active: true,
+    features: [
+      "Everything in Premium, plus:",
+      "Unlimited AI Tax Assistant messages per day",
+      "Annual $50 Credit toward verified CPA / EA Professional Review",
+      "Full Multi-Year Tax Comparison & Bracket Projections",
+      "Dedicated Human Support Ticket Priority Queue",
+      "Preparation Session Handoff & Dedicated Intake Review",
+    ],
+    limits: {
+      aiMessagesPerDay: 9999,
+      premiumReportsPerMonth: 9999,
+    },
+    entitlements: [
+      "calculator.basic",
+      "calculation.history",
+      "tax.insights.basic",
+      "tax.insights.advanced",
+      "ai.assistant",
+      "report.basic",
+      "report.premium",
+      "scenario.compare",
+      "scenario.compare.advanced",
+      "professional.handoff",
+    ],
+  },
 };
 
 /**
@@ -89,4 +124,58 @@ export function getProductPlan(planId?: string | null): ProductPlan {
 export function hasPlanEntitlement(planId: PlanId, entitlement: EntitlementKey): boolean {
   const plan = getProductPlan(planId);
   return plan.entitlements.includes(entitlement);
+}
+
+/**
+ * Returns the configured Stripe Price ID for a given paid plan and interval.
+ * Rejects Free plan (no price ID needed).
+ */
+export function getConfiguredStripePriceId(
+  planId: "premium" | "professional",
+  interval: "monthly" | "annual"
+): string {
+  if (planId === "premium") {
+    if (interval === "annual") {
+      return process.env.STRIPE_PRICE_ID_PREMIUM_ANNUAL || "price_test_premium_annual";
+    }
+    return (
+      process.env.STRIPE_PRICE_ID_PREMIUM_MONTHLY ||
+      process.env.STRIPE_PRICE_ID_PREMIUM ||
+      "price_test_premium_monthly"
+    );
+  }
+
+  if (planId === "professional") {
+    if (interval === "annual") {
+      return (
+        process.env.STRIPE_PRICE_ID_PROFESSIONAL_ANNUAL ||
+        "price_test_professional_annual"
+      );
+    }
+    return (
+      process.env.STRIPE_PRICE_ID_PROFESSIONAL ||
+      "price_test_professional_monthly"
+    );
+  }
+
+  throw new Error(`Unsupported plan for Stripe pricing: ${planId}`);
+}
+
+/**
+ * Validates that a given price ID belongs to an allowed configured plan.
+ */
+export function resolvePlanFromPriceId(
+  priceId: string
+): { planId: "premium" | "professional"; interval: "monthly" | "annual" } | null {
+  const pMonthly = getConfiguredStripePriceId("premium", "monthly");
+  const pAnnual = getConfiguredStripePriceId("premium", "annual");
+  const proMonthly = getConfiguredStripePriceId("professional", "monthly");
+  const proAnnual = getConfiguredStripePriceId("professional", "annual");
+
+  if (priceId === pMonthly) return { planId: "premium", interval: "monthly" };
+  if (priceId === pAnnual) return { planId: "premium", interval: "annual" };
+  if (priceId === proMonthly) return { planId: "professional", interval: "monthly" };
+  if (priceId === proAnnual) return { planId: "professional", interval: "annual" };
+
+  return null;
 }

@@ -256,6 +256,47 @@ describe("Tax preparation session", () => {
     ]);
   });
 
+  it("allows navigating to previously completed steps and rejects unreached steps", async () => {
+    await startSession(
+      createMockRequest("http://localhost:3000/api/v1/tax/preparation/session", {
+        method: "POST",
+        token: "prep-user-nav",
+        body: {},
+      })
+    );
+
+    // Complete taxpayer_profile to advance to income
+    await patchSession(
+      createMockRequest("http://localhost:3000/api/v1/tax/preparation/session", {
+        method: "PATCH",
+        token: "prep-user-nav",
+        body: { completeStep: "taxpayer_profile" },
+      })
+    );
+
+    // Navigate back to taxpayer_profile
+    const backRes = await patchSession(
+      createMockRequest("http://localhost:3000/api/v1/tax/preparation/session", {
+        method: "PATCH",
+        token: "prep-user-nav",
+        body: { navigateToStep: "taxpayer_profile" },
+      })
+    );
+    expect(backRes.status).toBe(200);
+    const backBody = await backRes.json();
+    expect(backBody.data.currentStep).toBe("taxpayer_profile");
+
+    // Attempt to jump forward to unreached calculation step
+    const jumpRes = await patchSession(
+      createMockRequest("http://localhost:3000/api/v1/tax/preparation/session", {
+        method: "PATCH",
+        token: "prep-user-nav",
+        body: { navigateToStep: "calculation" },
+      })
+    );
+    expect(jumpRes.status).toBe(400);
+  });
+
   it("defines owner-only RLS for preparation sessions", () => {
     const schema = readFileSync(join(process.cwd(), "supabase", "schema.sql"), "utf8");
     const migration = readFileSync(

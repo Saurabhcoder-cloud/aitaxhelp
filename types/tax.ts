@@ -136,6 +136,24 @@ export interface TaxCalculationResult {
   incomeTax?: number;
   selfEmploymentTax?: number;
   aboveTheLineDeduction?: number;
+  totalIncomeCents?: number;
+}
+
+// Calculation Input Snapshot Union & Normalizer
+export type TaxCalculationInputSnapshot =
+  | Record<string, unknown>
+  | IncomeTaxCalculationInput
+  | SelfEmployedCalculationInput;
+
+export function normalizeInputSnapshot(
+  snapshot: TaxCalculationInputSnapshot | undefined
+): Record<string, unknown> {
+  if (!snapshot || typeof snapshot !== "object") return {};
+  const record: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(snapshot)) {
+    record[key] = val;
+  }
+  return record;
 }
 
 // Calculation History & Persistence Record
@@ -146,7 +164,7 @@ export interface TaxCalculationRecord {
   taxYear: TaxYear;
   filingStatus: TaxFilingStatus;
   title: string;
-  inputSnapshot: Record<string, unknown>;
+  inputSnapshot: TaxCalculationInputSnapshot;
   resultSnapshot: TaxCalculationResult;
   engineVersion: string;
   rulesVersion: string;
@@ -160,7 +178,7 @@ export interface SaveCalculationRequest {
   taxYear: TaxYear;
   filingStatus: TaxFilingStatus;
   title?: string;
-  inputSnapshot: Record<string, unknown>;
+  inputSnapshot: TaxCalculationInputSnapshot;
   resultSnapshot: TaxCalculationResult;
 }
 

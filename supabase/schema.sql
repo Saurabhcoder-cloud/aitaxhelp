@@ -163,12 +163,15 @@ CREATE TABLE IF NOT EXISTS public.tax_preparation_sessions (
   income_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
   documents_snapshot JSONB NOT NULL DEFAULT '{"documents":[]}'::jsonb,
   deductions_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+  calculation_id UUID REFERENCES public.tax_calculations(id) ON DELETE SET NULL,
+  calculation_snapshot JSONB DEFAULT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_prep_sessions_user_id ON public.tax_preparation_sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_prep_sessions_user_updated ON public.tax_preparation_sessions(user_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_prep_sessions_calc_id ON public.tax_preparation_sessions(calculation_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_prep_sessions_one_open
   ON public.tax_preparation_sessions(user_id)
   WHERE status <> 'completed';

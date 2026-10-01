@@ -115,6 +115,112 @@ export class SubscriptionStore {
   }
 
   /**
+   * Retrieves a subscription by its Stripe subscription ID (e.g. sub_...).
+   */
+  public static async getByProviderSubscriptionId(providerSubscriptionId: string): Promise<UserSubscription | null> {
+    if (!providerSubscriptionId) return null;
+
+    if (SUPABASE_CONFIG.isConfigured()) {
+      const supabase = getServerSupabaseClient() as unknown as {
+        from: (table: string) => {
+          select: (cols: string) => {
+            eq: (col: string, val: string) => {
+              maybeSingle: () => Promise<{
+                data: SubscriptionDbRow | null;
+                error: { message: string } | null;
+              }>;
+            };
+          };
+        };
+      };
+
+      const { data, error } = await supabase
+        .from("subscriptions")
+        .select("*")
+        .eq("provider_subscription_id", providerSubscriptionId)
+        .maybeSingle();
+
+      if (error || !data) return null;
+
+      return {
+        id: data.id,
+        userId: data.user_id,
+        planId: (data.plan_id as PlanId) || "free",
+        status: (data.status as SubscriptionStatus) || "none",
+        provider: (data.provider as PaymentProviderName) || "none",
+        providerCustomerId: data.provider_customer_id || undefined,
+        providerSubscriptionId: data.provider_subscription_id || undefined,
+        currentPeriodStart: data.current_period_start,
+        currentPeriodEnd: data.current_period_end,
+        cancelAtPeriodEnd: Boolean(data.cancel_at_period_end),
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      };
+    }
+
+    const store = getMemoryStore();
+    for (const sub of store.values()) {
+      if (sub.providerSubscriptionId === providerSubscriptionId) {
+        return { ...sub };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Retrieves a subscription by its Stripe customer ID (e.g. cus_...).
+   */
+  public static async getByProviderCustomerId(providerCustomerId: string): Promise<UserSubscription | null> {
+    if (!providerCustomerId) return null;
+
+    if (SUPABASE_CONFIG.isConfigured()) {
+      const supabase = getServerSupabaseClient() as unknown as {
+        from: (table: string) => {
+          select: (cols: string) => {
+            eq: (col: string, val: string) => {
+              maybeSingle: () => Promise<{
+                data: SubscriptionDbRow | null;
+                error: { message: string } | null;
+              }>;
+            };
+          };
+        };
+      };
+
+      const { data, error } = await supabase
+        .from("subscriptions")
+        .select("*")
+        .eq("provider_customer_id", providerCustomerId)
+        .maybeSingle();
+
+      if (error || !data) return null;
+
+      return {
+        id: data.id,
+        userId: data.user_id,
+        planId: (data.plan_id as PlanId) || "free",
+        status: (data.status as SubscriptionStatus) || "none",
+        provider: (data.provider as PaymentProviderName) || "none",
+        providerCustomerId: data.provider_customer_id || undefined,
+        providerSubscriptionId: data.provider_subscription_id || undefined,
+        currentPeriodStart: data.current_period_start,
+        currentPeriodEnd: data.current_period_end,
+        cancelAtPeriodEnd: Boolean(data.cancel_at_period_end),
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      };
+    }
+
+    const store = getMemoryStore();
+    for (const sub of store.values()) {
+      if (sub.providerCustomerId === providerCustomerId) {
+        return { ...sub };
+      }
+    }
+    return null;
+  }
+
+  /**
    * Saves or updates a user's subscription record.
    */
   public static async save(sub: UserSubscription): Promise<UserSubscription> {
@@ -178,6 +284,12 @@ export class SubscriptionStore {
     }
 
     const store = getMemoryStore();
+    // Maintain single-subscription per userId invariant in memory
+    for (const [key, existing] of store.entries()) {
+      if (existing.userId === updatedRecord.userId && key !== updatedRecord.id) {
+        store.delete(key);
+      }
+    }
     store.set(updatedRecord.id, updatedRecord);
     return { ...updatedRecord };
   }

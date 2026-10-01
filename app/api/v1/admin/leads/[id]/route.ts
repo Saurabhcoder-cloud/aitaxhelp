@@ -57,21 +57,35 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       id,
       admin.id,
       validated.status as ProfessionalLeadStatus | undefined,
-      validated.note
+      validated.note,
+      validated.assignedProfessionalId || validated.assignedProfessionalName
+        ? {
+            professionalId: validated.assignedProfessionalId,
+            professionalName: validated.assignedProfessionalName,
+          }
+        : undefined
     );
 
     if (!updated) {
       throw new AppError("Lead not found.", 404, "NOT_FOUND");
     }
 
+    const action = validated.assignedProfessionalName
+      ? "admin_assigned_professional"
+      : validated.note
+      ? "admin_added_internal_note"
+      : "admin_updated_lead_status";
+
     await AuditLogStore.log({
       adminUserId: admin.id,
-      action: validated.note ? "admin_added_internal_note" : "admin_updated_lead_status",
+      action,
       targetType: "professional_lead",
       targetId: id,
       metadata: {
         newStatus: validated.status,
         noteAdded: !!validated.note,
+        assignedProfessionalName: validated.assignedProfessionalName,
+        assignedProfessionalId: validated.assignedProfessionalId,
       },
     });
 

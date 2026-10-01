@@ -16,6 +16,8 @@ import {
   fetchCurrentPreparationSession,
   startPreparationSession,
   updatePreparationProgress,
+  navigateToPreparationStep,
+  calculatePreparationSession,
 } from "@/lib/utils/preparation-session-api";
 import { IncomeDiscoveryPanel } from "@/components/preparation/IncomeDiscoveryPanel";
 import { DocumentsPanel } from "@/components/preparation/DocumentsPanel";
@@ -29,14 +31,15 @@ const NEXT_ACTION: Record<PreparationStep, string> = {
   income: "Tell us how you made money, then save those income sources before continuing.",
   documents: "Record which tax documents you have. You can continue if some are still missing.",
   deductions: "Answer the deduction questions for your income, then save them before continuing.",
-  calculation: "Calculation will reuse the existing tax calculators. The tax engine stays authoritative.",
-  review: "Review the preparation session before marking it complete.",
+  calculation: "Run deterministic tax calculation using official IRS statutory rules.",
+  review: "Review your calculated results, AI explanation, and professional handoff options before completing.",
 };
 
 export default function StartMyTaxesPage() {
   const [session, setSession] = useState<TaxPreparationSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -81,6 +84,32 @@ export default function StartMyTaxesPage() {
     setSession(result.data);
   };
 
+  const handleNavigateToStep = async (step: PreparationStep) => {
+    if (!session || session.currentStep === step) return;
+    setIsSaving(true);
+    setError(null);
+    const result = await navigateToPreparationStep(step);
+    setIsSaving(false);
+    if (!result.success || !result.data) {
+      setError(result.error || "Unable to navigate to step.");
+      return;
+    }
+    setSession(result.data);
+  };
+
+  const handleCalculate = async () => {
+    if (!session) return;
+    setIsCalculating(true);
+    setError(null);
+    const result = await calculatePreparationSession();
+    setIsCalculating(false);
+    if (!result.success || !result.data) {
+      setError(result.error || "Unable to execute tax calculation.");
+      return;
+    }
+    setSession(result.data);
+  };
+
   const completedCount = session
     ? PREPARATION_STEPS.filter((step) => session.steps[step] === "completed").length
     : 0;
@@ -98,7 +127,16 @@ export default function StartMyTaxesPage() {
           </p>
         </div>
         {session && (
-          <Badge variant="neutral" size="sm">
+          <Badge
+            variant={
+              session.status === "completed"
+                ? "emerald"
+                : session.status === "review"
+                ? "brand"
+                : "neutral"
+            }
+            size="sm"
+          >
             {session.status.replaceAll("_", " ")}
           </Badge>
         )}
@@ -134,7 +172,7 @@ export default function StartMyTaxesPage() {
                 </div>
                 <div className="h-2 rounded-full bg-surface-200 overflow-hidden" aria-hidden="true">
                   <div
-                    className="h-full bg-brand-600"
+                    className="h-full bg-brand-600 transition-all duration-300"
                     style={{ width: `${(completedCount / PREPARATION_STEPS.length) * 100}%` }}
                   />
                 </div>
@@ -144,11 +182,21 @@ export default function StartMyTaxesPage() {
                 {PREPARATION_STEPS.map((step) => {
                   const state = session.steps[step];
                   const isCurrent = session.currentStep === step && session.status !== "completed";
+                  const canNavigate = state === "completed" || step === "taxpayer_profile" || isCurrent;
                   return (
                     <li
                       key={step}
-                      className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-sm ${
-                        isCurrent ? "border-brand-300 bg-brand-50" : "border-surface-200"
+                      onClick={() => {
+                        if (canNavigate && !isCurrent && !isSaving) {
+                          handleNavigateToStep(step);
+                        }
+                      }}
+                      className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                        isCurrent
+                          ? "border-brand-300 bg-brand-50"
+                          : canNavigate
+                          ? "border-surface-200 hover:border-brand-200 hover:bg-surface-50 cursor-pointer"
+                          : "border-surface-200 opacity-60 cursor-not-allowed"
                       }`}
                     >
                       {state === "completed" ? (
@@ -157,6 +205,9 @@ export default function StartMyTaxesPage() {
                         <Circle className="w-4 h-4 text-surface-400 shrink-0" aria-hidden="true" />
                       )}
                       <span className="font-medium text-surface-900">{PREPARATION_STEP_LABELS[step]}</span>
+                      {canNavigate && !isCurrent && (
+                        <span className="text-[11px] text-brand-600 font-normal">Click to review</span>
+                      )}
                       <span className="ml-auto text-xs text-surface-500 capitalize">
                         {state.replaceAll("_", " ")}
                       </span>
@@ -177,8 +228,12 @@ export default function StartMyTaxesPage() {
                 <DeductionsPanel session={session} onSessionChange={setSession} />
               )}
 
-              {session.steps.income === "completed" && (
-                <TaxSituationSummaryPanel session={session} />
+              {(session.steps.income === "completed" || session.currentStep === "calculation" || session.currentStep === "review" || session.status === "completed") && (
+                <TaxSituationSummaryPanel
+                  session={session}
+                  onCalculate={session.currentStep === "calculation" ? handleCalculate : undefined}
+                  isCalculating={isCalculating}
+                />
               )}
 
               {session.currentStep !== "income" && session.incomeSnapshot.situations.length > 0 && (
@@ -204,7 +259,7 @@ export default function StartMyTaxesPage() {
                 <p className="text-sm font-semibold text-surface-900">Next action</p>
                 <p className="text-sm text-surface-700">
                   {session.status === "completed"
-                    ? "This preparation session is complete."
+                    ? "This preparation session is complete. You can inspect your saved calculation in Calculation History anytime."
                     : NEXT_ACTION[session.currentStep]}
                 </p>
                 {session.currentStep === "taxpayer_profile" && !session.profileSnapshot.profileReused && (
@@ -215,10 +270,55 @@ export default function StartMyTaxesPage() {
                 {session.status !== "completed" &&
                   session.currentStep !== "income" &&
                   session.currentStep !== "documents" &&
-                  session.currentStep !== "deductions" && (
+                  session.currentStep !== "deductions" &&
+                  session.currentStep !== "calculation" && (
                   <Button onClick={handleContinue} disabled={isSaving}>
-                    {isSaving ? "Saving..." : session.status === "draft" ? "Start My Taxes" : "Continue"}
+                    {isSaving
+                      ? "Saving..."
+                      : session.status === "draft"
+                      ? "Start My Taxes"
+                      : session.currentStep === "review"
+                      ? "Complete Preparation"
+                      : "Continue"}
                   </Button>
+                )}
+                {session.currentStep === "calculation" && (
+                  <div className="flex items-center gap-3">
+                    <Button
+                      onClick={handleCalculate}
+                      disabled={isCalculating || isSaving || session.situationSummary.calculationStatus !== "ready"}
+                    >
+                      {isCalculating ? "Calculating Taxes..." : "Run Tax Calculation"}
+                    </Button>
+                    {session.calculationSnapshot && (
+                      <Button onClick={handleContinue} variant="outline" disabled={isSaving}>
+                        {isSaving ? "Saving..." : "Continue to Review"}
+                      </Button>
+                    )}
+                  </div>
+                )}
+                {session.status === "completed" && session.calculationId && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Link href={`/dashboard/calculations/${session.calculationId}`}>
+                      <Button variant="outline" size="sm">
+                        View Saved Calculation
+                      </Button>
+                    </Link>
+                    <a
+                      href="/api/v1/tax/preparation/session/report?download=true"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Button variant="outline" size="sm">
+                        Export Session Report (HTML)
+                      </Button>
+                    </a>
+                    <Link href={`/dashboard/calculations/${session.calculationId}/report`}>
+                      <Button variant="outline" size="sm">
+                        Calculation Breakdown Report
+                      </Button>
+                    </Link>
+                  </div>
                 )}
               </div>
             </>

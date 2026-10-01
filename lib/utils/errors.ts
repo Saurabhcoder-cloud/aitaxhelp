@@ -23,10 +23,43 @@ export class AppError extends Error {
 }
 
 /**
+ * Checks whether an error represents Next.js dynamic server usage or static bailout.
+ * During static generation (npm run build), Next.js throws these errors when route
+ * handlers or pages access request-time context (e.g., request.headers, cookies, searchParams)
+ * to mark the route as dynamic (ƒ) rather than static.
+ */
+export function isDynamicServerError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+  const err = error as { digest?: unknown; message?: unknown; code?: unknown };
+  if (
+    typeof err.digest === "string" &&
+    (err.digest === "DYNAMIC_SERVER_USAGE" || err.digest === "BAILOUT_TO_CLIENT_SIDE_RENDERING")
+  ) {
+    return true;
+  }
+  if (err.code === "NEXT_STATIC_GEN_BAILOUT") {
+    return true;
+  }
+  if (typeof err.message === "string" && err.message.includes("Dynamic server usage")) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Sanitizes errors and returns a structured Next.js API response.
  * Completely strips stack traces, secrets, and raw database errors.
  */
 export function handleApiError(error: unknown): NextResponse<ApiErrorResponse> {
+  // Next.js build-time dynamic route detection (Dynamic Server Usage)
+  // Must be re-thrown so Next.js can bail out of static prerendering and designate
+  // the route as dynamic (ƒ) without erroneously logging application internal errors.
+  if (isDynamicServerError(error)) {
+    throw error;
+  }
+
   // Zod Validation Errors
   if (error instanceof ZodError) {
     const details = error.issues.map((issue) => ({

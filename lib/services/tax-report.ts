@@ -12,6 +12,7 @@ import {
   TaxDriver,
 } from "@/lib/services/tax-insights";
 import { formatCurrencyFromCents } from "@/lib/utils/currency";
+import type { TaxPreparationSession } from "@/lib/services/tax-preparation-session-store";
 
 export type ReportAccessTier = "free" | "paid" | "unlocked";
 
@@ -79,10 +80,23 @@ export interface TaxReportQuarterlySummary {
   safeHarborGuidance: string;
 }
 
+export interface TaxReportCalculationDetails {
+  calculationId: string;
+  totalIncomeCents: number;
+  grossIncomeCents: number;
+  taxableIncomeCents: number;
+  federalIncomeTaxCents: number;
+  totalTaxLiabilityCents: number;
+  estimatedRefundCents: number;
+  estimatedAmountOwedCents: number;
+}
+
 export interface TaxReport {
   id: string;
   calculationId: string;
   userId: string;
+  taxpayerName?: string;
+  calculation?: TaxReportCalculationDetails;
   reportVersion: "1.0";
   generatedAt: string;
   taxYear: TaxYear;
@@ -237,10 +251,26 @@ export function buildTaxReport(
   const taxDrivers = extractTaxDrivers(res);
   const planningInsights = generateTaxPlanningInsights(res, calculation.inputSnapshot);
 
+  const taxpayerName =
+    typeof rawInput.taxpayerName === "string" && rawInput.taxpayerName.trim()
+      ? rawInput.taxpayerName.trim()
+      : undefined;
+
   return {
     id: `report_${calculation.id}`,
     calculationId: calculation.id,
     userId: calculation.userId,
+    taxpayerName,
+    calculation: {
+      calculationId: calculation.id,
+      totalIncomeCents: res.grossIncomeCents,
+      grossIncomeCents: res.grossIncomeCents,
+      taxableIncomeCents: res.taxableIncomeCents,
+      federalIncomeTaxCents: res.federalIncomeTaxCents,
+      totalTaxLiabilityCents: res.totalTaxLiabilityCents,
+      estimatedRefundCents: res.estimatedRefundCents,
+      estimatedAmountOwedCents: res.estimatedAmountOwedCents,
+    },
     reportVersion: "1.0",
     generatedAt: new Date().toISOString(),
     taxYear: calculation.taxYear,
@@ -307,9 +337,10 @@ export function generateTaxReportDocument(report: TaxReport): string {
     day: "numeric",
   });
 
-  let doc = `# TaxAIHelp – Tax Summary Report
+  let doc = `# Tax Preparation & Filing Summary Report
+TaxAIHelp – Tax Summary Report
 Report Version: ${report.reportVersion} | Generated: ${dateFormatted}
-Calculation Title: ${report.title}
+${report.taxpayerName ? `Taxpayer: ${report.taxpayerName}\n` : ""}Calculation Title: ${report.title}
 Calculation ID: ${report.calculationId}
 Tax Year: ${report.taxYear} | Filing Status: ${filingStatusFormatted}
 Engine Version: v${report.engineVersion} | Ruleset: ${report.rulesVersion}
@@ -405,3 +436,159 @@ Deadlines:
 
   return doc;
 }
+
+/**
+ * Builds a verified tax summary report directly from an active preparation session
+ * that has executed a deterministic calculation.
+ */
+export function buildTaxReportFromPreparationSession(
+  session: TaxPreparationSession,
+  accessTier: ReportAccessTier = "free"
+): TaxReport {
+  if (!session.calculationSnapshot) {
+    throw new Error("Cannot generate tax report: preparation session has not run a calculation.");
+  }
+  const calc = session.calculationSnapshot;
+  const taxpayerName =
+    session.profileSnapshot.fullName ||
+    session.situationSummary.taxpayerName ||
+    undefined;
+
+  const rawInput: Record<string, unknown> = {
+    taxpayerName,
+    w2WagesCents: session.situationSummary.whatYouToldUs.w2WagesCents,
+    gross1099IncomeCents:
+      session.situationSummary.whatYouToldUs.form1099GrossCents +
+      session.situationSummary.whatYouToldUs.gigBusinessGrossCents,
+    businessExpensesCents: session.situationSummary.whatYouToldUs.expenseCents,
+    federalWithholdingCents: calc.totalPaymentsAndWithholdingCents,
+  };
+
+  const calculationId = session.calculationId || session.id;
+  const pseudoRecord: TaxCalculationRecord = {
+    id: calculationId,
+    userId: session.userId,
+    calculatorType: calc.calculatorType,
+    taxYear: session.taxYear,
+    filingStatus: session.profileSnapshot.filingStatus,
+    title: session.title,
+    inputSnapshot: rawInput,
+    resultSnapshot: {
+      ...calc,
+      calculationId,
+    },
+    engineVersion: calc.engineVersion,
+    rulesVersion: calc.rulesVersion,
+    createdAt: calc.calculatedAt || session.updatedAt,
+    updatedAt: session.updatedAt,
+  };
+
+  return buildTaxReport(pseudoRecord, accessTier);
+}
+
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/**
+ * Generates a clean, standalone, printable HTML document for a TaxReport.
+ */
+export function generateTaxReportHtml(report: TaxReport): string {
+  const ts = report.taxSummary;
+  const filingStatusFormatted = report.filingStatus.replace(/_/g, " ").toUpperCase();
+  const dateFormatted = new Date(report.generatedAt).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${report.title} - TaxAIHelp Tax Summary Report</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 40px; color: #1e293b; background: #fff; line-height: 1.5; }
+    .header { border-bottom: 2px solid #0f172a; padding-bottom: 16px; margin-bottom: 24px; }
+    .header h1 { margin: 0 0 6px 0; font-size: 24px; color: #0f172a; }
+    .header .meta { font-size: 13px; color: #64748b; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; text-transform: uppercase; background: #e0f2fe; color: #0369a1; }
+    .banner { padding: 16px; border-radius: 8px; margin-bottom: 24px; }
+    .banner.refund { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
+    .banner.owed { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+    .banner h2 { margin: 0; font-size: 22px; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 24px; }
+    .card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; background: #f8fafc; }
+    .card h3 { margin: 0 0 8px 0; font-size: 14px; text-transform: uppercase; color: #475569; letter-spacing: 0.05em; }
+    .card .val { font-size: 20px; font-weight: 700; color: #0f172a; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 14px; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #e2e8f0; }
+    th { background: #f1f5f9; font-weight: 600; color: #334155; }
+    .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; }
+    @media print { body { margin: 20px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h1>${report.title}</h1>
+      <span class="badge">CALCULATED RESULT — Deterministic Tax Engine v${report.engineVersion}</span>
+    </div>
+    <div class="meta">
+      ${report.taxpayerName ? `Taxpayer: <strong>${escapeHtml(report.taxpayerName)}</strong> | ` : ""}Tax Year: <strong>${report.taxYear}</strong> | Filing Status: <strong>${filingStatusFormatted}</strong> | Generated: <strong>${dateFormatted}</strong>
+    </div>
+  </div>
+
+  <div class="banner ${ts.estimatedRefundCents > 0 ? "refund" : ts.estimatedAmountOwedCents > 0 ? "owed" : ""}">
+    <h2>${report.paymentSummary.balanceStatusLabel}</h2>
+    <div style="font-size:13px; margin-top:4px;">
+      Total Federal Tax Liability: <strong>${formatCurrencyFromCents(ts.totalTaxLiabilityCents)}</strong> | 
+      Total Payments / Withholdings: <strong>${formatCurrencyFromCents(ts.totalPaymentsAndWithholdingCents)}</strong>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Total Gross Income</h3>
+      <div class="val">${formatCurrencyFromCents(ts.grossIncomeCents)}</div>
+      <div style="font-size:12px; color:#64748b; margin-top:4px;">Adjusted Gross Income: ${formatCurrencyFromCents(ts.adjustedGrossIncomeCents)}</div>
+    </div>
+    <div class="card">
+      <h3>Deductions Used</h3>
+      <div class="val">${formatCurrencyFromCents(ts.deductionUsedCents)}</div>
+      <div style="font-size:12px; color:#64748b; margin-top:4px;">Standard Deduction (${filingStatusFormatted})</div>
+    </div>
+    <div class="card">
+      <h3>Taxable Income</h3>
+      <div class="val">${formatCurrencyFromCents(ts.taxableIncomeCents)}</div>
+      <div style="font-size:12px; color:#64748b; margin-top:4px;">Subject to progressive IRS brackets</div>
+    </div>
+    <div class="card">
+      <h3>Effective Tax Rate</h3>
+      <div class="val">${(ts.effectiveTaxRate * 100).toFixed(1)}%</div>
+      <div style="font-size:12px; color:#64748b; margin-top:4px;">Marginal Bracket: ${Math.round(ts.marginalTaxBracket * 100)}%</div>
+    </div>
+  </div>
+
+  <h3 style="font-size:16px; margin-bottom:8px;">Income Breakdown</h3>
+  <table>
+    <thead><tr><th>Source</th><th>Amount</th><th>Description</th></tr></thead>
+    <tbody>
+      ${report.incomeSummary.sources.map(s => `<tr><td>${s.label}</td><td><strong>${formatCurrencyFromCents(s.amountCents)}</strong></td><td>${s.description}</td></tr>`).join("")}
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <p><strong>Disclaimer:</strong> ${report.disclaimer}</p>
+    <p style="margin-top:4px;">Calculation ID: ${report.calculationId} | Ruleset: ${report.rulesVersion} | Generated by TaxAIHelp</p>
+  </div>
+</body>
+</html>`;
+}
+

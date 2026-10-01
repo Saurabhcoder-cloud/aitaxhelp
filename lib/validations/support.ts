@@ -68,6 +68,7 @@ export function sanitizeSupportText(input: string): string {
 export const supportSafeContextSchema = z
   .object({
     calculationId: z.string().trim().max(100).optional(),
+    sessionId: z.string().trim().max(100).optional(),
     calculatorType: z.string().trim().max(50).optional(),
     taxYear: z.number().int().min(2020).max(2035).optional(),
     filingStatus: z.string().trim().max(50).optional(),

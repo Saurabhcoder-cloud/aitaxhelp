@@ -1,4 +1,4 @@
-export type PlanId = "free" | "premium";
+export type PlanId = "free" | "premium" | "professional";
 
 export type SubscriptionStatus =
   | "active"
@@ -7,6 +7,7 @@ export type SubscriptionStatus =
   | "canceled"
   | "incomplete"
   | "expired"
+  | "unpaid"
   | "none";
 
 export type PaymentProviderName = "stripe" | "none";

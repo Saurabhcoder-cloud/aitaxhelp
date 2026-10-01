@@ -18,7 +18,7 @@ const entrySchema = z
     category: z.enum(DEDUCTION_CATEGORIES),
     amountCents: centsSchema,
     description: z.string().trim().max(200).default(""),
-    relatedIncomeId: z.string().uuid().nullable(),
+    relatedIncomeId: z.string().uuid().nullable().optional().default(null),
     confirmed: z.boolean(),
   })
   .strict();

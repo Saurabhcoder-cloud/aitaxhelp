@@ -115,9 +115,12 @@ function AIAssistantContent() {
   const searchParams = useSearchParams();
   const queryCalculationId = searchParams.get("calculationId") || undefined;
   const queryConversationId = searchParams.get("conversationId") || undefined;
+  const querySessionId = searchParams.get("sessionId") || undefined;
+  const queryPrompt = searchParams.get("q") || undefined;
 
   const [conversationId, setConversationId] = useState<string | undefined>(queryConversationId);
   const [activeCalculationId, setActiveCalculationId] = useState<string | undefined>(queryCalculationId);
+  const [activeSessionId, setActiveSessionId] = useState<string | undefined>(querySessionId);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -129,6 +132,7 @@ function AIAssistantContent() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const calculationExplainedRef = useRef(false);
+  const queryProcessedRef = useRef(false);
 
   const initWelcomeMessage = useCallback(() => {
     setMessages([
@@ -152,7 +156,7 @@ function AIAssistantContent() {
   }, []);
 
   const handleSendMessage = useCallback(
-    async (textToSend?: string, calculationIdOverride?: string) => {
+    async (textToSend?: string, calculationIdOverride?: string, sessionIdOverride?: string) => {
       const text = (textToSend !== undefined ? textToSend : inputMessage).trim();
       if (!text || isSubmitting) return;
 
@@ -176,11 +180,13 @@ function AIAssistantContent() {
       setIsSubmitting(true);
 
       const activeCalcId = calculationIdOverride !== undefined ? calculationIdOverride : activeCalculationId;
+      const activeSessId = sessionIdOverride !== undefined ? sessionIdOverride : activeSessionId;
 
       try {
         const response = await sendAssistantMessage({
           message: text,
           calculationId: activeCalcId,
+          sessionId: activeSessId,
           conversationId,
         });
 
@@ -209,12 +215,14 @@ function AIAssistantContent() {
         setErrorMessage(errorText);
         setLastFailedText(text);
 
-        // If the calculation context was missing or unauthorized, detach it safely to unblock future messages
+        // If the calculation or session context was missing or unauthorized, detach it safely to unblock future messages
         if (
           errorText.toLowerCase().includes("referenced calculation was not found") ||
+          errorText.toLowerCase().includes("referenced preparation session was not found") ||
           errorText.toLowerCase().includes("not found")
         ) {
           setActiveCalculationId(undefined);
+          setActiveSessionId(undefined);
         }
 
         const errorMsg: ChatMessage = {
@@ -236,7 +244,7 @@ function AIAssistantContent() {
         textareaRef.current?.focus();
       }
     },
-    [inputMessage, isSubmitting, activeCalculationId, conversationId]
+    [inputMessage, isSubmitting, activeCalculationId, activeSessionId, conversationId]
   );
 
   const handleRetry = useCallback(() => {
@@ -248,16 +256,22 @@ function AIAssistantContent() {
   const handleStartNewSession = () => {
     setConversationId(undefined);
     setActiveCalculationId(undefined);
+    setActiveSessionId(undefined);
     setErrorMessage(null);
     setLastFailedText(null);
     setHistoryLoadNotice(null);
     setInputMessage("");
     calculationExplainedRef.current = false;
+    queryProcessedRef.current = false;
     initWelcomeMessage();
   };
 
   const handleDetachCalculation = () => {
     setActiveCalculationId(undefined);
+  };
+
+  const handleDetachSession = () => {
+    setActiveSessionId(undefined);
   };
 
   useEffect(() => {
@@ -306,6 +320,23 @@ function AIAssistantContent() {
       );
     }
   }, [queryCalculationId, messages.length, handleSendMessage]);
+
+  // If sessionId or specific initial query was provided, trigger explanation automatically once
+  useEffect(() => {
+    if (!queryProcessedRef.current && messages.length > 0) {
+      if (queryPrompt) {
+        queryProcessedRef.current = true;
+        handleSendMessage(queryPrompt, undefined, querySessionId);
+      } else if (querySessionId && !queryCalculationId) {
+        queryProcessedRef.current = true;
+        handleSendMessage(
+          "Please explain my active tax preparation session, calculation results, and next steps.",
+          undefined,
+          querySessionId
+        );
+      }
+    }
+  }, [queryPrompt, querySessionId, queryCalculationId, messages.length, handleSendMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -359,7 +390,9 @@ function AIAssistantContent() {
             <Link
               href={`/dashboard/support/new?category=AI_ASSISTANT${
                 conversationId ? `&conversationId=${encodeURIComponent(conversationId)}` : ""
-              }${activeCalculationId ? `&calculationId=${encodeURIComponent(activeCalculationId)}` : ""}`}
+              }${activeCalculationId ? `&calculationId=${encodeURIComponent(activeCalculationId)}` : ""}${
+                activeSessionId ? `&sessionId=${encodeURIComponent(activeSessionId)}` : ""
+              }`}
             >
               <Button variant="outline" size="sm" className="gap-1.5 text-xs text-surface-600 hover:text-red-700">
                 <LifeBuoy className="w-3.5 h-3.5" />
@@ -383,6 +416,28 @@ function AIAssistantContent() {
             >
               <X className="w-3.5 h-3.5" />
             </button>
+          </div>
+        )}
+
+        {/* Active Attached Preparation Session Context Pill */}
+        {activeSessionId && (
+          <div className="mb-4 p-3 bg-brand-50 border border-brand-200 rounded-xl text-xs text-brand-900 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-brand-700 shrink-0" />
+              <span>
+                <strong>Tax Preparation Session Attached:</strong> AI answers are strictly grounded in your active Tax Preparation Session (ID:{" "}
+                <span className="font-mono text-brand-800">{activeSessionId.slice(0, 8)}...</span>)
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDetachSession}
+              className="h-7 px-2.5 text-[11px] text-brand-800 border-brand-300 hover:bg-brand-100"
+            >
+              <X className="w-3 h-3 mr-1" />
+              Detach Session
+            </Button>
           </div>
         )}
 

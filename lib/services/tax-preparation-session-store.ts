@@ -1,7 +1,8 @@
-import { TaxYear } from "@/types/tax";
+import { TaxYear, TaxCalculationResult, TaxCalculationRecord } from "@/types/tax";
 import { SUPABASE_CONFIG } from "@/lib/supabase/config";
 import { getServerSupabaseClient } from "@/lib/supabase/server";
 import { UserProfileStore } from "@/lib/services/user-profile-store";
+import { TaxCalculationStore } from "@/lib/services/tax-calculation-store";
 import { AppError } from "@/lib/utils/errors";
 import { suggestPreparationCalculators, PreparationCalculatorLink } from "@/lib/preparation/calculators";
 import { emptyIncomeDiscovery, IncomeDiscovery, suggestCalculatorsForIncome } from "@/lib/preparation/income";
@@ -30,6 +31,7 @@ import {
   completeCurrentStep,
   emptyStepMap,
 } from "@/lib/preparation/steps";
+import { executePreparationCalculation } from "@/lib/preparation/calculation";
 
 export interface TaxPreparationSession {
   id: string;
@@ -47,6 +49,8 @@ export interface TaxPreparationSession {
   situationSummary: TaxSituationSummary;
   calculationReadiness: CalculationReadiness;
   suggestedCalculators: PreparationCalculatorLink[];
+  calculationId?: string | null;
+  calculationSnapshot?: TaxCalculationResult | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -64,6 +68,8 @@ interface PreparationSessionRow {
   income_snapshot?: IncomeDiscovery | null;
   documents_snapshot?: DocumentsSnapshot | null;
   deductions_snapshot?: DeductionDiscovery | null;
+  calculation_id?: string | null;
+  calculation_snapshot?: TaxCalculationResult | null;
   created_at: string;
   updated_at: string;
 }
@@ -134,12 +140,24 @@ function toPublic(record: TaxPreparationSession): TaxPreparationSession {
     income: incomeSnapshot,
     documents: documentsSnapshot,
     deductions: deductionsSnapshot,
+    calculationSnapshot: record.calculationSnapshot,
+    calculationId: record.calculationId,
   };
+  const calculationId = record.calculationId || null;
+  const calculationSnapshot = record.calculationSnapshot
+    ? {
+        ...record.calculationSnapshot,
+        calculationId: calculationId || record.calculationSnapshot.calculationId,
+      }
+    : null;
+
   return {
     ...record,
     incomeSnapshot,
     documentsSnapshot,
     deductionsSnapshot,
+    calculationId,
+    calculationSnapshot,
     situationSummary: buildTaxSituationSummary(summaryInput),
     calculationReadiness: assessCalculationReadiness(summaryInput),
     suggestedCalculators:
@@ -150,6 +168,14 @@ function toPublic(record: TaxPreparationSession): TaxPreparationSession {
 }
 
 function fromRow(row: PreparationSessionRow): TaxPreparationSession {
+  const calculationId = row.calculation_id || null;
+  const calculationSnapshot = row.calculation_snapshot
+    ? {
+        ...row.calculation_snapshot,
+        calculationId: calculationId || row.calculation_snapshot.calculationId,
+      }
+    : null;
+
   return toPublic({
     id: row.id,
     userId: row.user_id,
@@ -163,6 +189,8 @@ function fromRow(row: PreparationSessionRow): TaxPreparationSession {
     incomeSnapshot: readIncome(row.income_snapshot),
     documentsSnapshot: readDocuments(row.documents_snapshot),
     deductionsSnapshot: readDeductions(row.deductions_snapshot),
+    calculationId,
+    calculationSnapshot,
     situationSummary: undefined as unknown as TaxSituationSummary,
     calculationReadiness: undefined as unknown as CalculationReadiness,
     suggestedCalculators: [],
@@ -241,6 +269,8 @@ export class TaxPreparationSessionStore {
       incomeSnapshot: emptyIncomeDiscovery(),
       documentsSnapshot: emptyDocumentsSnapshot(),
       deductionsSnapshot: emptyDeductionDiscovery(),
+      calculationId: null,
+      calculationSnapshot: null,
       situationSummary: undefined as unknown as TaxSituationSummary,
       calculationReadiness: undefined as unknown as CalculationReadiness,
       suggestedCalculators: [],
@@ -292,6 +322,13 @@ export class TaxPreparationSessionStore {
         throw new AppError(deductionCheck.message, 422, "VALIDATION_ERROR");
       }
     }
+    if (completeStep === "calculation" && !current.calculationSnapshot) {
+      throw new AppError(
+        "Run tax calculation before continuing to review.",
+        422,
+        "VALIDATION_ERROR"
+      );
+    }
 
     const advanced = completeCurrentStep(current.steps, current.currentStep);
     const updated: TaxPreparationSession = {
@@ -309,6 +346,48 @@ export class TaxPreparationSessionStore {
 
     getMemoryStore().set(updated.id, updated);
     return toPublic(updated);
+  }
+
+  /**
+   * Sets the current active step to an already reached/completed step or taxpayer_profile,
+   * allowing the user to review or modify previous sections.
+   */
+  public static async navigateToStep(
+    userId: string,
+    targetStep: PreparationStep
+  ): Promise<TaxPreparationSession> {
+    const current = await this.getCurrent(userId);
+    if (!current) {
+      throw new AppError("No open tax preparation session.", 404, "NOT_FOUND");
+    }
+    if (!PREPARATION_STEPS.includes(targetStep)) {
+      throw new AppError("Unknown preparation step.", 422, "VALIDATION_ERROR");
+    }
+
+    const canNavigate =
+      targetStep === current.currentStep ||
+      current.steps[targetStep] === "completed" ||
+      targetStep === "taxpayer_profile";
+
+    if (!canNavigate) {
+      throw new AppError(
+        "Cannot jump forward to uncompleted steps.",
+        400,
+        "INVALID_NAVIGATION"
+      );
+    }
+
+    if (current.currentStep === targetStep) {
+      return current;
+    }
+
+    const updated: TaxPreparationSession = {
+      ...current,
+      currentStep: targetStep,
+      updatedAt: new Date().toISOString(),
+    };
+
+    return this.persist(updated);
   }
 
   /**
@@ -423,6 +502,96 @@ export class TaxPreparationSessionStore {
     return this.persist(updated);
   }
 
+  /**
+   * Runs the deterministic tax calculation on the open session, persists the
+   * calculation result to calculation history, links it to the preparation session,
+   * and advances progress to the review step.
+   *
+   * SECURITY & COMPLIANCE:
+   * - Deterministic tax engine is the only computation authority.
+   * - Input validation prevents calculation on incomplete/invalid sessions.
+   * - Persists into tax_calculations table with authenticated ownership.
+   */
+  public static async calculate(userId: string): Promise<TaxPreparationSession> {
+    const current = await this.getCurrent(userId);
+    if (!current) {
+      throw new AppError("No open tax preparation session.", 404, "NOT_FOUND");
+    }
+
+    const readiness = assessCalculationReadiness({
+      profile: current.profileSnapshot,
+      steps: current.steps,
+      income: current.incomeSnapshot,
+      documents: current.documentsSnapshot,
+      deductions: current.deductionsSnapshot,
+    });
+
+    if (!readiness.ready) {
+      const errorDetails = [...readiness.missing, ...readiness.errors].join("; ");
+      throw new AppError(
+        `Cannot calculate tax: Preparation session is incomplete (${errorDetails}).`,
+        422,
+        "VALIDATION_ERROR"
+      );
+    }
+
+    const execution = executePreparationCalculation({
+      taxYear: current.taxYear,
+      profileSnapshot: current.profileSnapshot,
+      steps: current.steps,
+      incomeSnapshot: current.incomeSnapshot,
+      documentsSnapshot: current.documentsSnapshot,
+      deductionsSnapshot: current.deductionsSnapshot,
+    });
+
+    const now = new Date().toISOString();
+    const calculationId = crypto.randomUUID();
+
+    const calculationResult: TaxCalculationResult = {
+      ...execution.result,
+      calculationId,
+    };
+
+    const calculationRecord: TaxCalculationRecord = {
+      id: calculationId,
+      userId,
+      calculatorType: execution.calculatorType,
+      taxYear: current.taxYear,
+      filingStatus: current.profileSnapshot.filingStatus,
+      title: `${current.taxYear} Preparation Calculation`,
+      inputSnapshot: execution.inputSnapshot,
+      resultSnapshot: calculationResult,
+      engineVersion: execution.result.engineVersion,
+      rulesVersion: execution.result.rulesVersion,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const savedCalculation = await TaxCalculationStore.save(calculationRecord);
+
+    const updatedSteps: PreparationStepMap = {
+      ...current.steps,
+      taxpayer_profile: "completed",
+      income: "completed",
+      documents: "completed",
+      deductions: "completed",
+      calculation: "completed",
+      review: "current",
+    };
+
+    const updated: TaxPreparationSession = {
+      ...current,
+      status: "review",
+      currentStep: "review",
+      steps: updatedSteps,
+      calculationId: savedCalculation.id,
+      calculationSnapshot: calculationResult,
+      updatedAt: now,
+    };
+
+    return this.persist(updated);
+  }
+
   private static async persist(updated: TaxPreparationSession): Promise<TaxPreparationSession> {
     if (SUPABASE_CONFIG.isConfigured()) {
       const saved = await this.updateDatabase(updated);
@@ -494,6 +663,8 @@ export class TaxPreparationSessionStore {
         income_snapshot: record.incomeSnapshot,
         documents_snapshot: record.documentsSnapshot,
         deductions_snapshot: record.deductionsSnapshot,
+        calculation_id: record.calculationId || null,
+        calculation_snapshot: record.calculationSnapshot || null,
         created_at: record.createdAt,
         updated_at: record.updatedAt,
       })
@@ -531,6 +702,8 @@ export class TaxPreparationSessionStore {
         income_snapshot: record.incomeSnapshot,
         documents_snapshot: record.documentsSnapshot,
         deductions_snapshot: record.deductionsSnapshot,
+        calculation_id: record.calculationId || null,
+        calculation_snapshot: record.calculationSnapshot || null,
         updated_at: record.updatedAt,
       })
       .eq("id", record.id)

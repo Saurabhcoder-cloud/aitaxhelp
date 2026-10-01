@@ -42,6 +42,7 @@ export type SupportAuthorType = "USER" | "ADMIN" | "SYSTEM";
  */
 export interface SupportTicketSafeContext {
   calculationId?: string;
+  sessionId?: string;
   calculatorType?: string;
   taxYear?: number;
   filingStatus?: string;

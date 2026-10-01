@@ -156,6 +156,7 @@ describe("Admin & Professional Lead Management Suite (Phase 5 Step 9)", () => {
       preferredContactMethod: "email",
       urgency: "immediate",
       status: "new",
+      reviewType: "cpa",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -200,6 +201,7 @@ describe("Admin & Professional Lead Management Suite (Phase 5 Step 9)", () => {
       preferredContactMethod: "phone",
       urgency: "this_month",
       status: "new",
+      reviewType: "cpa",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -256,6 +258,7 @@ describe("Admin & Professional Lead Management Suite (Phase 5 Step 9)", () => {
       preferredContactMethod: "email",
       urgency: "immediate",
       status: "new",
+      reviewType: "cpa",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -298,6 +301,7 @@ describe("Admin & Professional Lead Management Suite (Phase 5 Step 9)", () => {
       preferredContactMethod: "email",
       urgency: "immediate",
       status: "new",
+      reviewType: "cpa",
       internalNotes: [
         {
           id: "secret-note-1",
@@ -449,6 +453,7 @@ describe("Admin & Professional Lead Management Suite (Phase 5 Step 9)", () => {
       preferredContactMethod: "email",
       urgency: "immediate",
       status: "new",
+      reviewType: "cpa",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -489,6 +494,7 @@ describe("Admin & Professional Lead Management Suite (Phase 5 Step 9)", () => {
         preferredContactMethod: "email",
         urgency: "immediate",
         status: "new",
+        reviewType: "cpa",
         createdAt: new Date(Date.now() - i * 1000).toISOString(),
         updatedAt: new Date().toISOString(),
       });
@@ -529,6 +535,7 @@ describe("Admin & Professional Lead Management Suite (Phase 5 Step 9)", () => {
       preferredContactMethod: "email",
       urgency: "immediate",
       status: "new",
+      reviewType: "cpa",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -558,6 +565,7 @@ describe("Admin & Professional Lead Management Suite (Phase 5 Step 9)", () => {
       preferredContactMethod: "email",
       urgency: "immediate",
       status: "new",
+      reviewType: "cpa",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });

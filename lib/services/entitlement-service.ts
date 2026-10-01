@@ -10,10 +10,16 @@ import {
 import { AppError } from "@/lib/utils/errors";
 
 export class EntitlementService {
-  private static async resolveActivePlanId(userId: string): Promise<"free" | "premium"> {
+  private static async resolveActivePlanId(userId: string): Promise<"free" | "premium" | "professional"> {
     const subscription = await SubscriptionStore.getActiveSubscription(userId);
-    if (subscription && subscription.status === "active" && subscription.planId === "premium") {
-      return "premium";
+    if (subscription) {
+      const isEntitled =
+        subscription.status === "active" || subscription.status === "trialing";
+
+      if (isEntitled) {
+        if (subscription.planId === "professional") return "professional";
+        if (subscription.planId === "premium") return "premium";
+      }
     }
     return "free";
   }

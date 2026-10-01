@@ -23,6 +23,13 @@ export function setGeminiMockHandler(handler: GeminiMockHandler | null): void {
   activeMockHandler = handler;
 }
 
+export function isGeminiAvailable(): boolean {
+  if (process.env.NODE_ENV === "test" || process.env.VITEST) {
+    return activeMockHandler !== null;
+  }
+  return activeMockHandler !== null || GEMINI_CONFIG.isConfigured();
+}
+
 /**
  * Server-only Gemini API transport client.
  * Calls Google Generative AI REST endpoint directly without bloated third-party SDK dependencies.

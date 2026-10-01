@@ -58,6 +58,22 @@ export async function updatePreparationProgress(
   });
 }
 
+export async function navigateToPreparationStep(
+  navigateToStep: PreparationStep
+): Promise<PreparationSessionApiResponse> {
+  return requestPreparationSession("/api/v1/tax/preparation/session", {
+    method: "PATCH",
+    body: JSON.stringify({ navigateToStep }),
+  });
+}
+
+export async function calculatePreparationSession(): Promise<PreparationSessionApiResponse> {
+  return requestPreparationSession("/api/v1/tax/preparation/session/calculate", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
 async function requestPreparationSession(
   url: string,
   init: RequestInit

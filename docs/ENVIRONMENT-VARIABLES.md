@@ -24,6 +24,10 @@ Variables are cleanly separated into:
 | `GEMINI_API_KEY` | Server-Only | **SECRET** | Feature-Dependent | `AIzaSy...` | Server key for Google Gemini AI conversational explanations. Required if `ai.assistant_enabled` is true. |
 | `STRIPE_SECRET_KEY` | Server-Only | **SECRET** | Feature-Dependent | `sk_live_...` | Stripe server secret key for subscription checkouts. Required if `billing.enabled` is true. |
 | `STRIPE_WEBHOOK_SECRET` | Server-Only | **SECRET** | Feature-Dependent | `whsec_...` | HMAC-SHA256 signature verification secret for Stripe billing events. |
+| `STRIPE_PRICE_ID_PREMIUM_MONTHLY` | Server-Only | Config | Feature-Dependent | `price_...` | Stripe recurring price ID for Premium Monthly subscription. |
+| `STRIPE_PRICE_ID_PREMIUM_ANNUAL` | Server-Only | Config | Feature-Dependent | `price_...` | Stripe recurring price ID for Premium Annual subscription. |
+| `STRIPE_PRICE_ID_PROFESSIONAL` | Server-Only | Config | Feature-Dependent | `price_...` | Stripe recurring price ID for Professional Monthly subscription. |
+| `STRIPE_PRICE_ID_PROFESSIONAL_ANNUAL` | Server-Only | Config | Feature-Dependent | `price_...` | Stripe recurring price ID for Professional Annual subscription. |
 | `EMAIL_PROVIDER` | Server-Only | Config | Optional | `null` | Active email transport: `null` (skip), `console` (dev log), `resend`, or `smtp`. |
 | `EMAIL_API_KEY` | Server-Only | **SECRET** | Feature-Dependent | `re_...` | API key for transactional email provider. Required if email enabled and provider != `null`. |
 | `EMAIL_FROM` | Server-Only | Config | Optional | `TaxAIHelp <notifications@taxaihelp.com>` | Sender display name and outbound address. |

@@ -2,8 +2,8 @@ import {
   BillingInterval,
   PaymentProviderName,
   PlanId,
-  UserSubscription,
 } from "@/types/monetization";
+import { StripeClient, StripeEvent } from "@/lib/stripe/client";
 
 export const PAYMENT_PROVIDER_NAME: PaymentProviderName = "stripe";
 
@@ -12,6 +12,7 @@ export interface CheckoutSessionResult {
   url: string | null;
   isStaging: boolean;
   message: string;
+  customerId?: string;
 }
 
 export interface PaymentProvider {
@@ -20,70 +21,74 @@ export interface PaymentProvider {
   createCheckoutSession(
     userId: string,
     userEmail: string,
-    planId: PlanId,
+    planId: "premium" | "professional",
     interval: BillingInterval,
-    returnUrl: string
+    returnUrl: string,
+    customerId?: string
   ): Promise<CheckoutSessionResult>;
   cancelSubscription(providerSubscriptionId: string): Promise<boolean>;
-  verifyWebhookSignature(payload: string, signature: string | null): Promise<boolean>;
+  verifyWebhookSignature(payload: string, signature: string | null): Promise<StripeEvent>;
+  createPortalSession(customerId: string, returnUrl: string): Promise<{ url: string }>;
 }
 
 export class StripePaymentProvider implements PaymentProvider {
   public readonly name: PaymentProviderName = "stripe";
 
   public isConfigured(): boolean {
-    const key = process.env.STRIPE_SECRET_KEY;
-    return typeof key === "string" && key.trim().length > 0 && !key.includes("placeholder");
+    return StripeClient.isConfigured();
   }
 
   public async createCheckoutSession(
     userId: string,
     userEmail: string,
-    planId: PlanId,
+    planId: "premium" | "professional",
     interval: BillingInterval,
-    returnUrl: string
+    returnUrl: string,
+    customerId?: string
   ): Promise<CheckoutSessionResult> {
-    if (!this.isConfigured()) {
-      return {
-        sessionId: null,
-        url: null,
-        isStaging: true,
-        message:
-          "Stripe live payments are not configured. Card processing is currently in staging mode.",
-      };
-    }
+    const successUrl = `${returnUrl}/success?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${returnUrl}/cancel`;
 
-    // In a live Stripe environment, this would call stripe.checkout.sessions.create.
-    // Zero fake checkout session IDs are fabricated.
+    const result = await StripeClient.createCheckoutSession({
+      userId,
+      userEmail,
+      planId,
+      interval,
+      successUrl,
+      cancelUrl,
+      customerId,
+    });
+
     return {
-      sessionId: `staging_checkout_${Date.now()}`,
-      url: `${returnUrl}?session_id=staging_checkout_${Date.now()}`,
-      isStaging: true,
-      message: "Stripe checkout session prepared in staging environment.",
+      sessionId: result.sessionId,
+      url: result.url,
+      isStaging: !this.isConfigured(),
+      message: this.isConfigured()
+        ? "Stripe checkout session initialized successfully."
+        : "Stripe test checkout session initialized in staging mode.",
+      customerId: result.customerId,
     };
   }
 
-  public async cancelSubscription(_providerSubscriptionId: string): Promise<boolean> {
-    if (!this.isConfigured()) {
-      return false;
-    }
-    return true;
+  public async cancelSubscription(providerSubscriptionId: string): Promise<boolean> {
+    return StripeClient.cancelSubscription(providerSubscriptionId);
   }
 
   public async verifyWebhookSignature(
     payload: string,
     signature: string | null
-  ): Promise<boolean> {
-    if (!signature || !this.isConfigured()) {
-      return false;
-    }
-    const secret = process.env.STRIPE_WEBHOOK_SECRET;
-    if (!secret || secret.trim().length === 0) {
-      return false;
-    }
+  ): Promise<StripeEvent> {
+    return StripeClient.verifyWebhookSignature(payload, signature);
+  }
 
-    // Signature verification logic
-    return signature.length > 20;
+  public async createPortalSession(
+    customerId: string,
+    returnUrl: string
+  ): Promise<{ url: string }> {
+    return StripeClient.createBillingPortalSession({
+      customerId,
+      returnUrl,
+    });
   }
 }
 

@@ -7,10 +7,20 @@ export const startPreparationSessionSchema = z
 
 export const updatePreparationProgressSchema = z
   .object({
-    completeStep: z.enum(PREPARATION_STEPS, {
-      errorMap: () => ({ message: "Unknown preparation step." }),
-    }),
+    completeStep: z
+      .enum(PREPARATION_STEPS, {
+        errorMap: () => ({ message: "Unknown preparation step." }),
+      })
+      .optional(),
+    navigateToStep: z
+      .enum(PREPARATION_STEPS, {
+        errorMap: () => ({ message: "Unknown preparation step." }),
+      })
+      .optional(),
   })
-  .strict();
+  .strict()
+  .refine((data) => data.completeStep !== undefined || data.navigateToStep !== undefined, {
+    message: "Either completeStep or navigateToStep must be provided.",
+  });
 
 export type UpdatePreparationProgressInput = z.infer<typeof updatePreparationProgressSchema>;

@@ -33,6 +33,13 @@ const nextConfig = {
       ],
     },
   ],
+  redirects: async () => [
+    {
+      source: "/ai-assistant",
+      destination: "/ai-tax-assistant",
+      permanent: true,
+    },
+  ],
 };
 
 export default nextConfig;

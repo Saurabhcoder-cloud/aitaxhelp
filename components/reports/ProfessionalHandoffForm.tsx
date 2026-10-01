@@ -63,6 +63,7 @@ export function ProfessionalHandoffForm({
 
     const apiRes = await submitProfessionalLead({
       calculationId: calculation.id,
+      reviewType: "cpa",
       taxpayerName: taxpayerName.trim(),
       email: email.trim(),
       phone: phone.trim() || undefined,

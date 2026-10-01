@@ -60,7 +60,14 @@ export async function PATCH(req: NextRequest) {
       throw new AppError("Malformed JSON in request body.", 400, "BAD_REQUEST");
     }
 
-    const validated = updateProfileRequestSchema.parse(rawBody);
+    const raw = (rawBody && typeof rawBody === "object") ? (rawBody as Record<string, unknown>) : {};
+    const normalizedBody = (raw.profile || raw.taxProfile)
+      ? raw
+      : {
+          profile: typeof raw.fullName === "string" ? { fullName: raw.fullName } : undefined,
+        };
+
+    const validated = updateProfileRequestSchema.parse(normalizedBody);
 
     let updatedProfile = await UserProfileStore.getProfile(user.id, user.email);
     let updatedTaxProfile = await UserProfileStore.getTaxProfile(user.id);

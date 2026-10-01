@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import Link from "next/link";
-import { TaxCalculationResult, CalculatorType, TaxYear } from "@/types/tax";
+import { TaxCalculationResult, CalculatorType, TaxYear, TaxCalculationInputSnapshot } from "@/types/tax";
 import { formatCurrencyFromCents } from "@/lib/utils/currency";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -12,7 +12,7 @@ import { Sparkles } from "lucide-react";
 
 export interface CalculatorResultPanelProps {
   result: TaxCalculationResult;
-  inputSnapshot?: Record<string, unknown>;
+  inputSnapshot?: TaxCalculationInputSnapshot;
   hideSaveAction?: boolean;
   className?: string;
 }

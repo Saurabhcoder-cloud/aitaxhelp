@@ -1,4 +1,4 @@
-import { callGeminiApi } from "./client";
+import { callGeminiApi, isGeminiAvailable } from "./client";
 import { SYSTEM_PROMPTS } from "./prompts";
 import {
   calculateIncomeTax,
@@ -27,6 +27,11 @@ import {
   extractTaxDrivers,
 } from "@/lib/services/tax-insights";
 import { EntitlementService } from "@/lib/services/entitlement-service";
+import {
+  TaxPreparationSessionStore,
+  TaxPreparationSession,
+} from "@/lib/services/tax-preparation-session-store";
+import { listIncomeSources } from "@/lib/preparation/income";
 
 
 export interface DeterministicTaxToolInput {
@@ -286,6 +291,174 @@ function buildDeterministicSummary(
 }
 
 /**
+ * Builds a deterministic factual reply for an active preparation session.
+ * Handles the 6 contextual questions (why owe/refund, missing information, deductions,
+ * what to review, simple language, explain tax result) using verified session data.
+ */
+export function buildPreparationSessionDeterministicReply(
+  session: TaxPreparationSession,
+  query: string
+): string {
+  const lower = query.toLowerCase();
+  const summary = session.situationSummary;
+  const calc = session.calculationSnapshot;
+  const filingStatusFormatted = session.profileSnapshot.filingStatus.replace(/_/g, " ");
+
+  // Contextual question 1: Why do I owe/refund this amount?
+  if (
+    lower.includes("why do i owe") ||
+    lower.includes("why owe") ||
+    lower.includes("why refund") ||
+    lower.includes("why do i get a refund") ||
+    lower.includes("why is my refund")
+  ) {
+    if (!calc) {
+      return (
+        `Your tax calculation has not been run yet. Please complete the remaining preparation steps and run the tax calculation to see your verified result.`
+      );
+    }
+    const refundOrDueText =
+      calc.estimatedRefundCents > 0
+        ? `You have an estimated federal refund of **${formatCurrencyFromCents(calc.estimatedRefundCents)}** because your Total Payments & Withholdings (${formatCurrencyFromCents(calc.totalPaymentsAndWithholdingCents)}) exceeded your Total Federal Tax Liability (${formatCurrencyFromCents(calc.totalTaxLiabilityCents)}).`
+        : calc.estimatedAmountOwedCents > 0
+        ? `You have an estimated federal balance due of **${formatCurrencyFromCents(calc.estimatedAmountOwedCents)}** because your Total Federal Tax Liability (${formatCurrencyFromCents(calc.totalTaxLiabilityCents)}) exceeded your Total Payments & Withholdings (${formatCurrencyFromCents(calc.totalPaymentsAndWithholdingCents)}).`
+        : `Your tax position is exactly balanced ($0.00). Your Total Payments & Withholdings exactly match your Total Federal Tax Liability (${formatCurrencyFromCents(calc.totalTaxLiabilityCents)}).`;
+
+    const breakdown = `\n\n- **Total Payments & Withholdings**: ${formatCurrencyFromCents(calc.totalPaymentsAndWithholdingCents)}\n- **Total Federal Tax Liability**: ${formatCurrencyFromCents(calc.totalTaxLiabilityCents)}`;
+
+    let seNote = "";
+    if (calc.selfEmploymentTaxCents > 0) {
+      seNote = `\n\n*Note: Your tax liability includes **${formatCurrencyFromCents(calc.selfEmploymentTaxCents)}** in statutory Schedule SE self-employment tax on your freelance/gig receipts.*`;
+    }
+
+    return `${refundOrDueText}${breakdown}${seNote}\n\n*This estimate was computed deterministically under IRS rules for Tax Year ${session.taxYear}. AI never calculates or alters tax numbers.*`;
+  }
+
+  // Contextual question 2: What information am I missing?
+  if (
+    lower.includes("missing") ||
+    lower.includes("what am i missing") ||
+    lower.includes("what info is missing") ||
+    lower.includes("what information am i missing") ||
+    lower.includes("needed")
+  ) {
+    if (summary.informationStillNeeded.length > 0) {
+      const items = summary.informationStillNeeded.map((item) => `- **${item}**`).join("\n");
+      return (
+        `### Missing Information & Next Steps (${session.taxYear} Preparation):\n\n` +
+        `${items}\n\n` +
+        `Current step: **${session.currentStep.replace(/_/g, " ")}** (${summary.calculationStatus === "ready" ? "ready for calculation" : "more details needed"}).`
+      );
+    }
+    return (
+      `### Missing Information & Next Steps (${session.taxYear} Preparation):\n\n` +
+      `All required preparation details have been provided for your ${session.taxYear} session! ` +
+      (calc
+        ? `Your tax calculation has been completed (${calc.estimatedRefundCents > 0 ? `estimated refund of ${formatCurrencyFromCents(calc.estimatedRefundCents)}` : calc.estimatedAmountOwedCents > 0 ? `estimated balance due of ${formatCurrencyFromCents(calc.estimatedAmountOwedCents)}` : "balanced"}). You can proceed to the review step.`
+        : `Your tax calculation has not been run yet. Please complete the remaining preparation steps and run the tax calculation to see your verified result.`)
+    );
+  }
+
+  // Contextual question 3: Explain my deductions
+  if (
+    lower.includes("deduction") ||
+    lower.includes("explain deductions") ||
+    lower.includes("standard deduction") ||
+    lower.includes("expenses")
+  ) {
+    const stdDeductionCents = calc
+      ? calc.deductionUsedCents
+      : session.taxYear === 2025
+      ? session.profileSnapshot.filingStatus === "married_filing_jointly"
+        ? 30_000_00
+        : 15_000_00
+      : 14_600_00;
+    const expenseCents = summary.whatYouToldUs.expenseCents;
+
+    let text = `For tax year **${session.taxYear}** with filing status **${filingStatusFormatted}**, the deterministic tax engine applies the official IRS statutory Standard Deduction of **${formatCurrencyFromCents(stdDeductionCents)}** to reduce your taxable income.`;
+
+    text += `\n\n- **Standard Deduction**: ${formatCurrencyFromCents(stdDeductionCents)}`;
+    text += `\n- **Business Expenses**: ${formatCurrencyFromCents(expenseCents)}${expenseCents > 0 ? " (reduces net self-employment profit prior to income tax)" : ""}`;
+
+    if (calc?.selfEmploymentDetails?.deductibleHalfCents) {
+      text += `\n\nYou also receive an above-the-line deduction of **${formatCurrencyFromCents(calc.selfEmploymentDetails.deductibleHalfCents)}** (50% of your self-employment tax), which reduces your Adjusted Gross Income (AGI).`;
+    }
+
+    text += `\n\n*Notice: Complex itemized deductions (Schedule A) are not supported in this baseline version. The IRS Standard Deduction is used.*`;
+    return text;
+  }
+
+  // Contextual question 4: What should I review before submitting?
+  if (
+    lower.includes("review before submitting") ||
+    lower.includes("what should i review") ||
+    lower.includes("what to review") ||
+    lower.includes("checklist")
+  ) {
+    return (
+      `### Pre-Submission Checklist for ${session.taxYear} Preparation:\n\n` +
+      `1. **Taxpayer Profile**: Verify your filing status (**${filingStatusFormatted}**) and legal name (${session.profileSnapshot.fullName || "Taxpayer"}).\n` +
+      `2. **Income Verification**: Ensure all income sources are reported. Currently recorded:\n` +
+      `   - W-2 Wages: ${formatCurrencyFromCents(summary.whatYouToldUs.w2WagesCents)}\n` +
+      `   - 1099 & Gig Gross: ${formatCurrencyFromCents(summary.whatYouToldUs.form1099GrossCents + summary.whatYouToldUs.gigBusinessGrossCents)}\n` +
+      `3. **Deduction Support**: Verify recorded business costs (${formatCurrencyFromCents(summary.whatYouToldUs.expenseCents)}) and ensure you have receipts/records.\n` +
+      `4. **Withholding & Payments**: Confirm federal tax withholdings match your Form W-2 Box 2 and Form 1099 statements.\n` +
+      `5. **Calculation Accuracy**: Review the deterministic tax engine results on the Tax Situation Summary.\n` +
+      `6. **Professional Handoff**: If you have complex questions or want certified assurance, you can request a licensed CPA or Enrolled Agent review directly from the preparation review page.`
+    );
+  }
+
+  // Contextual question 5: Explain this in simple language
+  if (
+    lower.includes("simple language") ||
+    lower.includes("simple terms") ||
+    lower.includes("plain english") ||
+    lower.includes("explain simply") ||
+    lower.includes("easy to understand")
+  ) {
+    const totalIncome =
+      summary.whatYouToldUs.w2WagesCents +
+      summary.whatYouToldUs.form1099GrossCents +
+      summary.whatYouToldUs.gigBusinessGrossCents;
+    if (!calc) {
+      return (
+        `Here is how your taxes work in simple terms:\n\n` +
+        `- **Money you made**: ${formatCurrencyFromCents(totalIncome)}\n` +
+        `- **Where you are right now**: You are on the "${session.currentStep.replace(/_/g, " ")}" step of preparing your taxes.\n` +
+        `- **Next step**: Your tax calculation has not been run yet. Please complete your answers and click "Run Tax Calculation" to see your verified result.`
+      );
+    }
+    return (
+      `Here is how your taxes work in simple terms:\n\n` +
+      `1. **Money you made**: ${formatCurrencyFromCents(calc.grossIncomeCents)} total from all your jobs and gigs.\n` +
+      `2. **Money the IRS doesn't tax**: ${formatCurrencyFromCents(calc.deductionUsedCents)} (the standard deduction for ${filingStatusFormatted}).\n` +
+      `3. **Income subject to tax**: ${formatCurrencyFromCents(calc.taxableIncomeCents)}.\n` +
+      `4. **Calculated tax bill**: ${formatCurrencyFromCents(calc.totalTaxLiabilityCents)}.\n` +
+      `5. **Tax you already paid during the year**: ${formatCurrencyFromCents(calc.totalPaymentsAndWithholdingCents)} (withheld from your paychecks).\n` +
+      `6. **Final score**: ${calc.estimatedRefundCents > 0 ? `You get a **refund of ${formatCurrencyFromCents(calc.estimatedRefundCents)}** because you paid more than you owed!` : calc.estimatedAmountOwedCents > 0 ? `You have an estimated **balance due of ${formatCurrencyFromCents(calc.estimatedAmountOwedCents)}** because your tax was higher than your withholdings.` : "You are completely even ($0.00)!"}`
+    );
+  }
+
+  // Contextual question 6 & general: Explain my tax result
+  if (calc) {
+    return buildDeterministicSummary(
+      calc,
+      `### Calculated Result for **${session.title}**:`
+    );
+  }
+
+  return (
+    `Your tax preparation session (**${session.title}**) is currently on step **${session.currentStep.replace(/_/g, " ")}**.\n\n` +
+    `- **Tax Year**: ${session.taxYear}\n` +
+    `- **Filing Status**: ${filingStatusFormatted}\n` +
+    `- **Reported W-2 Wages**: ${formatCurrencyFromCents(summary.whatYouToldUs.w2WagesCents)}\n` +
+    `- **Reported 1099/Gig Receipts**: ${formatCurrencyFromCents(summary.whatYouToldUs.form1099GrossCents + summary.whatYouToldUs.gigBusinessGrossCents)}\n` +
+    `- **Status**: ${summary.calculationStatus === "ready" ? "Ready to run calculation" : "Details still needed"}\n\n` +
+    `Your tax calculation has not been run yet. Please complete the remaining preparation steps and run the tax calculation to see your verified result.`
+  );
+}
+
+/**
  * Main Pipeline Orchestrator:
  * User Message
  * ↓
@@ -369,7 +542,148 @@ export async function processAssistantRequest(
     };
   }
 
-  // 5. Historical Calculation Context (if calculationId is supplied)
+  // 5. Active Preparation Session Context (if sessionId is supplied or context.sessionId is supplied)
+  const requestedSessionId =
+    request.sessionId ||
+    (typeof request.context?.sessionId === "string" ? request.context.sessionId : undefined);
+
+  if (requestedSessionId) {
+    const session = await TaxPreparationSessionStore.getCurrent(user.id);
+
+    if (!session || (requestedSessionId !== "current" && session.id !== requestedSessionId)) {
+      throw new AppError(
+        "Referenced preparation session was not found or access is denied.",
+        404,
+        "NOT_FOUND"
+      );
+    }
+
+    const calc = session.calculationSnapshot;
+    const filingStatusFormatted = session.profileSnapshot.filingStatus.replace(/_/g, " ");
+    const incomeSourcesList =
+      listIncomeSources(session.incomeSnapshot)
+        .map((s) => s.label)
+        .join(", ") || "None recorded yet";
+
+    let driversSummary = "";
+    let insightsSummary = "";
+    if (calc) {
+      const structuredInsights = generateTaxPlanningInsights(calc, {
+        w2WagesCents: session.situationSummary.whatYouToldUs.w2WagesCents,
+        gross1099IncomeCents:
+          session.situationSummary.whatYouToldUs.form1099GrossCents +
+          session.situationSummary.whatYouToldUs.gigBusinessGrossCents,
+        businessExpensesCents: session.situationSummary.whatYouToldUs.expenseCents,
+      });
+      const taxDrivers = extractTaxDrivers(calc);
+
+      driversSummary = taxDrivers
+        .map((d) => `- ${d.title} (${d.importance}): ${d.impactDescription}`)
+        .join("\n");
+      insightsSummary = structuredInsights
+        .map((i) => `- [${i.category.toUpperCase()}] ${i.title}: ${i.explanation}`)
+        .join("\n");
+    }
+
+    let explanation = "";
+    if (!calc || !isGeminiAvailable()) {
+      explanation = buildPreparationSessionDeterministicReply(session, request.message);
+    } else {
+      try {
+        const taxpayerName =
+          session.profileSnapshot.fullName ||
+          session.situationSummary.taxpayerName ||
+          "Taxpayer";
+        const prompt =
+          `The user is asking: "${request.message}"\n\n` +
+          `Explain this verified active Tax Preparation Session in TaxAIHelp without calculating or changing any numbers:\n` +
+          `- Taxpayer Name: ${taxpayerName}\n` +
+          `- Session Title: ${session.title}\n` +
+          `- Tax Year: ${session.taxYear}\n` +
+          `- Filing Status: ${filingStatusFormatted}\n` +
+          `- Current Preparation Step: ${session.currentStep} (Lifecycle Status: ${session.status})\n` +
+          `- Income Sources: ${incomeSourcesList}\n` +
+          `- W-2 Wages: ${formatCurrencyFromCents(session.situationSummary.whatYouToldUs.w2WagesCents)}\n` +
+          `- 1099/Gig Gross: ${formatCurrencyFromCents(session.situationSummary.whatYouToldUs.form1099GrossCents + session.situationSummary.whatYouToldUs.gigBusinessGrossCents)}\n` +
+          `- Confirmed Business Expenses: ${formatCurrencyFromCents(session.situationSummary.whatYouToldUs.expenseCents)}\n` +
+          `- Missing Information / Requirements: ${session.situationSummary.informationStillNeeded.join("; ") || "None"}\n` +
+          `- Preparation Warnings: ${session.situationSummary.warnings.join("; ") || "None"}\n\n` +
+          `VERIFIED DETERMINISTIC CALCULATION RESULT:\n` +
+          `- Gross Income: ${formatCurrencyFromCents(calc.grossIncomeCents)}\n` +
+          `- Standard Deduction: ${formatCurrencyFromCents(calc.deductionUsedCents)}\n` +
+          `- Taxable Income: ${formatCurrencyFromCents(calc.taxableIncomeCents)}\n` +
+          `- Federal Liability: ${formatCurrencyFromCents(calc.totalTaxLiabilityCents)}\n` +
+          `- Effective Rate: ${(calc.effectiveTaxRate * 100).toFixed(1)}%\n` +
+          `- Top Marginal Bracket: ${(calc.marginalTaxBracket * 100).toFixed(0)}%\n` +
+          `- Total Withholding / Payments: ${formatCurrencyFromCents(calc.totalPaymentsAndWithholdingCents)}\n` +
+          `- Net Position: ${calc.estimatedRefundCents > 0 ? `Estimated Refund of ${formatCurrencyFromCents(calc.estimatedRefundCents)}` : calc.estimatedAmountOwedCents > 0 ? `Estimated Balance Due of ${formatCurrencyFromCents(calc.estimatedAmountOwedCents)}` : "Balanced ($0.00)"}\n` +
+          `- Calculation Engine Version: v${calc.engineVersion} (Ruleset: ${calc.rulesVersion})\n\n` +
+          `Verified Tax Drivers:\n${driversSummary}\n\n` +
+          `Verified Planning Insights:\n${insightsSummary}\n\n` +
+          `CRITICAL COMPLIANCE RULES:\n` +
+          `1. Do NOT calculate, guess, or invent tax numbers. All figures must strictly come from the verified session data above.\n` +
+          `2. Keep the three pillars distinct: Calculated Result (engine), AI Explanation (educational only), and Professional Review (recommend licensed CPA/EA for uncertain situations).\n` +
+          `3. Answer the user's question directly with educational clarity.\n`;
+
+        explanation = await callGeminiApi(SYSTEM_PROMPTS.taxExplainer, prompt);
+        if (!explanation || explanation.startsWith("I am your TaxAIHelp educational assistant")) {
+          explanation = buildPreparationSessionDeterministicReply(session, request.message);
+        }
+      } catch (_err) {
+        explanation = buildPreparationSessionDeterministicReply(session, request.message);
+      }
+    }
+
+    await ConversationStore.saveMessage(
+      conversation.id,
+      user.id,
+      "assistant",
+      explanation,
+      session.calculationId || undefined
+    );
+
+    const suggestedActions = [
+      { label: "Why do I owe/refund this amount?", action: "Why do I owe/refund this amount?" },
+      { label: "Explain my deductions", action: "Explain my deductions." },
+      { label: "What information am I missing?", action: "What information am I missing?" },
+      { label: "What should I review before submitting?", action: "What should I review before submitting?" },
+      { label: "Explain this in simple language", action: "Explain this in simple language." },
+      { label: "Return to Preparation", href: "/dashboard/taxes" },
+    ];
+
+    if (calc && session.calculationId) {
+      suggestedActions.unshift({
+        label: "Download Tax Report",
+        href: `/api/v1/tax/preparation/session/report?download=true`,
+      });
+      suggestedActions.unshift({
+        label: "Request CPA Review",
+        href: `/dashboard/calculations/${session.calculationId}/professional`,
+      });
+    }
+
+    return {
+      answer: explanation,
+      reply: explanation,
+      intent: "EXPLAIN_CALCULATION",
+      calculation: calc
+        ? {
+            result: {
+              ...calc,
+              calculationId: session.calculationId || calc.calculationId,
+            },
+            engineVersion: calc.engineVersion,
+            rulesVersion: calc.rulesVersion,
+            isHistorical: true,
+          }
+        : undefined,
+      conversationId: conversation.id,
+      suggestedActions,
+      warnings: session.situationSummary.warnings,
+    };
+  }
+
+  // 6. Historical Calculation Context (if calculationId is supplied)
   if (request.calculationId) {
     const historicalCalc = await TaxCalculationStore.getById(
       request.calculationId,

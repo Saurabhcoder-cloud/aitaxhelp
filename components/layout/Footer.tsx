@@ -20,7 +20,7 @@ export function Footer() {
               </span>
             </Link>
             <p className="mt-3 text-sm text-surface-400 max-w-sm leading-relaxed">
-              Smarter Tax Help, Powered by AI. Providing deterministic federal tax calculations, educational breakdowns, and AI-assisted tax navigation for US taxpayers.
+              AI explains. The tax engine calculates. Comprehensive tax navigation, preparation, deterministic IRS calculation, and licensed professional escalation for US taxpayers.
             </p>
             <div className="mt-6 flex items-center gap-3 text-xs text-surface-400">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-navy-900 border border-surface-800 text-surface-300">

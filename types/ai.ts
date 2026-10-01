@@ -36,6 +36,7 @@ export interface AIMessageRecord {
 export interface AIAssistantRequest {
   message: string;
   calculationId?: string;
+  sessionId?: string;
   conversationId?: string;
   userId?: string;
   context?: Record<string, unknown>;

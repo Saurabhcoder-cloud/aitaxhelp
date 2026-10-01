@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { TaxCalculationRecord, CalculatorType } from "@/types/tax";
+import { TaxCalculationRecord, CalculatorType, normalizeInputSnapshot } from "@/types/tax";
 import { formatCurrencyFromCents } from "@/lib/utils/currency";
 import { fetchCalculationById } from "@/lib/utils/calculation-history-api";
 import { CalculatorResultPanel } from "@/components/calculators/CalculatorResultPanel";
@@ -49,7 +49,7 @@ interface HistoricalDisplayInputs {
 
 function parseHistoricalInputs(calculation: TaxCalculationRecord): HistoricalDisplayInputs {
   const { calculatorType, inputSnapshot, taxYear, filingStatus } = calculation;
-  const raw = (inputSnapshot || {}) as Record<string, unknown>;
+  const raw = normalizeInputSnapshot(inputSnapshot);
 
   const display: HistoricalDisplayInputs = {
     taxYear,

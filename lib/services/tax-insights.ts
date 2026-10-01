@@ -1,4 +1,8 @@
-import { TaxCalculationResult, TaxCalculationRecord } from "@/types/tax";
+import {
+  TaxCalculationResult,
+  TaxCalculationRecord,
+  TaxCalculationInputSnapshot,
+} from "@/types/tax";
 import { formatCurrencyFromCents } from "@/lib/utils/currency";
 
 export type InsightCategory =
@@ -79,7 +83,7 @@ export interface ScenarioComparisonResult {
  */
 export function generateTaxPlanningInsights(
   result: TaxCalculationResult,
-  _inputs?: Record<string, unknown>
+  _inputs?: TaxCalculationInputSnapshot
 ): TaxPlanningInsight[] {
   const insights: TaxPlanningInsight[] = [];
 

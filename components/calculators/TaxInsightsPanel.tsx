@@ -1,5 +1,5 @@
 import React from "react";
-import { TaxCalculationResult } from "@/types/tax";
+import { TaxCalculationResult, TaxCalculationInputSnapshot } from "@/types/tax";
 import {
   generateTaxPlanningInsights,
   extractTaxDrivers,
@@ -23,7 +23,7 @@ import {
 
 export interface TaxInsightsPanelProps {
   result: TaxCalculationResult;
-  inputSnapshot?: Record<string, unknown>;
+  inputSnapshot?: TaxCalculationInputSnapshot;
   title?: string;
   className?: string;
 }

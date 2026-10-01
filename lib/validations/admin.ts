@@ -7,19 +7,51 @@ export const adminPaginationSchema = z.object({
 
 export const adminLeadQuerySchema = adminPaginationSchema.extend({
   q: z.string().trim().max(100).optional(),
-  status: z.enum(["new", "contacted", "in_progress", "closed"]).optional(),
+  status: z
+    .enum([
+      "new",
+      "requested",
+      "received",
+      "assigned",
+      "contacted",
+      "in_progress",
+      "review_in_progress",
+      "closed",
+      "completed",
+      "cancelled",
+    ])
+    .optional(),
   taxYear: z.coerce.number().int().min(2020).max(2030).optional(),
 });
 
 export const adminUpdateLeadSchema = z
   .object({
-    status: z.enum(["new", "contacted", "in_progress", "closed"]).optional(),
+    status: z
+      .enum([
+        "new",
+        "requested",
+        "received",
+        "assigned",
+        "contacted",
+        "in_progress",
+        "review_in_progress",
+        "closed",
+        "completed",
+        "cancelled",
+      ])
+      .optional(),
     note: z.string().trim().max(2000).optional(),
+    assignedProfessionalId: z.string().trim().max(64).optional(),
+    assignedProfessionalName: z.string().trim().max(100).optional(),
   })
   .refine(
-    (data) => data.status !== undefined || (data.note !== undefined && data.note.length > 0),
+    (data) =>
+      data.status !== undefined ||
+      (data.note !== undefined && data.note.length > 0) ||
+      data.assignedProfessionalId !== undefined ||
+      data.assignedProfessionalName !== undefined,
     {
-      message: "At least one of status or note must be provided.",
+      message: "At least one update field (status, note, or assignment) must be provided.",
     }
   );
 

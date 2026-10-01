@@ -17,8 +17,15 @@ import {
   AlertCircle,
   Loader2,
   Send,
+  FileText,
+  Download,
+  AlertTriangle,
+  FolderCheck,
+  DollarSign,
+  UserPlus,
 } from "lucide-react";
 import { ProfessionalLeadRecord, ProfessionalLeadStatus } from "@/lib/services/professional-lead-store";
+import { formatCurrencyFromCents } from "@/lib/utils/currency";
 
 export default function AdminLeadDetailPage({
   params,
@@ -35,6 +42,8 @@ export default function AdminLeadDetailPage({
 
   // Form states
   const [newStatus, setNewStatus] = useState<ProfessionalLeadStatus>("new");
+  const [assignedId, setAssignedId] = useState("");
+  const [assignedName, setAssignedName] = useState("");
   const [newNote, setNewNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -50,8 +59,11 @@ export default function AdminLeadDetailPage({
         }
         const json = await res.json();
         if (json.success && json.data) {
-          setLead(json.data);
-          setNewStatus(json.data.status);
+          const data: ProfessionalLeadRecord = json.data;
+          setLead(data);
+          setNewStatus(data.status);
+          setAssignedId(data.assignedProfessionalId || "");
+          setAssignedName(data.assignedProfessionalName || "");
         }
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Error loading lead.");
@@ -74,6 +86,8 @@ export default function AdminLeadDetailPage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           status: newStatus,
+          assignedProfessionalId: assignedId.trim() || undefined,
+          assignedProfessionalName: assignedName.trim() || undefined,
           note: newNote.trim() || undefined,
         }),
       });
@@ -85,7 +99,7 @@ export default function AdminLeadDetailPage({
 
       setLead(json.data);
       setNewNote("");
-      setFeedback({ type: "success", text: "Lead status & internal notes updated successfully." });
+      setFeedback({ type: "success", text: "Lead status, assignment, and internal notes updated successfully." });
       router.refresh();
     } catch (err: unknown) {
       setFeedback({
@@ -124,6 +138,8 @@ export default function AdminLeadDetailPage({
     );
   }
 
+  const snap = lead.sessionSnapshot;
+
   return (
     <div className="space-y-6">
       {/* Top Breadcrumb & Actions */}
@@ -136,6 +152,15 @@ export default function AdminLeadDetailPage({
           <span>Back to All Leads</span>
         </Link>
         <div className="flex items-center gap-2">
+          {lead.reviewType && (
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-md uppercase bg-purple-100 text-purple-800 border border-purple-200">
+              {lead.reviewType === "cpa"
+                ? "CPA Review"
+                : lead.reviewType === "enrolled_agent"
+                ? "Enrolled Agent (EA)"
+                : "Tax Professional"}
+            </span>
+          )}
           <span className="text-xs font-mono text-surface-500 bg-surface-200/60 px-2.5 py-1 rounded-md">
             ID: {lead.id}
           </span>
@@ -215,29 +240,177 @@ export default function AdminLeadDetailPage({
               </div>
             </div>
 
-            {/* Tax Info & Linked Calculation */}
-            <div className="p-4 bg-brand-50/50 rounded-xl border border-brand-100 space-y-2">
-              <span className="text-xs font-bold text-brand-900 uppercase tracking-wider">
-                Linked Tax Calculation Record
+            {/* Tax Info & Linked Records */}
+            <div className="p-4 bg-brand-50/50 rounded-xl border border-brand-100 space-y-3">
+              <span className="text-xs font-bold text-brand-900 uppercase tracking-wider block">
+                Linked Tax Records
               </span>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm">
                 <div>
                   <div className="font-semibold text-surface-900">
                     Tax Year {lead.taxYear} &bull; <span className="capitalize">{lead.filingStatus.replace(/_/g, " ")}</span>
                   </div>
-                  <div className="text-xs text-surface-500 font-mono mt-0.5">
-                    ID: {lead.calculationId}
+                  <div className="text-xs text-surface-500 font-mono mt-0.5 space-y-0.5">
+                    {lead.calculationId && <div>Calculation ID: {lead.calculationId}</div>}
+                    {lead.sessionId && <div>Session ID: {lead.sessionId}</div>}
                   </div>
                 </div>
-                <Link
-                  href={`/admin/calculations/${lead.calculationId}`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg shadow-2xs transition-colors shrink-0"
-                >
-                  <span>Inspect Calculation</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </Link>
+                <div className="flex flex-wrap items-center gap-2">
+                  {lead.calculationId && (
+                    <Link
+                      href={`/admin/calculations/${lead.calculationId}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg shadow-2xs transition-colors shrink-0"
+                    >
+                      <span>Calculation</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Link>
+                  )}
+                  {lead.sessionId && (
+                    <a
+                      href="/api/v1/tax/preparation/session/report?download=true"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-100 hover:bg-surface-200 text-surface-800 text-xs font-semibold rounded-lg border border-surface-300 transition-colors shrink-0"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download Report</span>
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
+
+            {/* Session Snapshot: Professional Review Context */}
+            {snap && (
+              <div className="bg-surface-50/60 rounded-xl border border-surface-200 p-4 space-y-4">
+                <div className="flex items-center justify-between border-b border-surface-200 pb-2">
+                  <div className="flex items-center gap-2">
+                    <FolderCheck className="w-4 h-4 text-purple-600" />
+                    <span className="text-xs font-bold text-surface-900 uppercase tracking-wider">
+                      Tax Preparation Intake Snapshot
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-mono text-surface-500">
+                    Session: {snap.sessionId}
+                  </span>
+                </div>
+
+                {/* Calculation Summary from Snapshot */}
+                {snap.calculationResult && (
+                  <div className="p-3 bg-white rounded-lg border border-surface-200 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <div>
+                      <span className="text-surface-500 text-[10px] uppercase font-semibold">Total Income</span>
+                      <p className="font-bold text-surface-900">
+                        {snap.calculationResult.totalIncomeCents !== undefined
+                          ? formatCurrencyFromCents(snap.calculationResult.totalIncomeCents)
+                          : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-surface-500 text-[10px] uppercase font-semibold">Taxable Income</span>
+                      <p className="font-bold text-surface-900">
+                        {formatCurrencyFromCents(snap.calculationResult.taxableIncomeCents)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-surface-500 text-[10px] uppercase font-semibold">Total Liability</span>
+                      <p className="font-bold text-surface-900">
+                        {formatCurrencyFromCents(snap.calculationResult.totalTaxLiabilityCents)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-surface-500 text-[10px] uppercase font-semibold">
+                        {snap.calculationResult.refundOrBalanceDue?.type === "refund" ? "Est. Refund" : "Balance Due"}
+                      </span>
+                      <p className={`font-extrabold ${snap.calculationResult.refundOrBalanceDue?.type === "refund" ? "text-emerald-700" : "text-amber-700"}`}>
+                        {formatCurrencyFromCents(snap.calculationResult.refundOrBalanceDue?.amountCents || 0)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Income Breakdown */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="p-3 bg-white rounded-lg border border-surface-200 space-y-1">
+                    <span className="text-surface-500 font-semibold uppercase text-[10px]">W-2 Income</span>
+                    <p className="font-bold text-surface-900">{snap.w2Count} Form(s)</p>
+                    <p className="text-[11px] text-surface-600">
+                      Wages: {formatCurrencyFromCents(snap.totalW2WagesCents)}
+                    </p>
+                    <p className="text-[11px] text-surface-500">
+                      Withholding: {formatCurrencyFromCents(snap.totalW2WithholdingCents)}
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-white rounded-lg border border-surface-200 space-y-1">
+                    <span className="text-surface-500 font-semibold uppercase text-[10px]">1099 Income</span>
+                    <p className="font-bold text-surface-900">{snap.form1099Count} Form(s)</p>
+                    <p className="text-[11px] text-surface-600">
+                      Gross: {formatCurrencyFromCents(snap.total1099GrossCents)}
+                    </p>
+                    <p className="text-[11px] text-surface-500">
+                      Withholding: {formatCurrencyFromCents(snap.total1099WithholdingCents)}
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-white rounded-lg border border-surface-200 space-y-1">
+                    <span className="text-surface-500 font-semibold uppercase text-[10px]">Gig / Business</span>
+                    <p className="font-bold text-surface-900">{snap.gigCount} Platform(s)</p>
+                    <p className="text-[11px] text-surface-600">
+                      Gross: {formatCurrencyFromCents(snap.gigGrossCents)}
+                    </p>
+                    <p className="text-[11px] text-surface-500">
+                      Expenses: {formatCurrencyFromCents(snap.gigExpenseCents)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Deductions & Documents */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 bg-white rounded-lg border border-surface-200 space-y-1">
+                    <span className="text-surface-500 font-semibold uppercase text-[10px]">Deductions</span>
+                    <p className="font-bold text-surface-900 capitalize">
+                      {snap.deductionsType} deduction
+                    </p>
+                    {snap.deductionsType === "itemized" && (
+                      <p className="text-surface-600">
+                        Itemized Total:{" "}
+                        {snap.itemizedTotalCents !== undefined
+                          ? formatCurrencyFromCents(snap.itemizedTotalCents)
+                          : "—"}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="p-3 bg-white rounded-lg border border-surface-200 space-y-1">
+                    <span className="text-surface-500 font-semibold uppercase text-[10px]">Documents Checklist</span>
+                    <p className="font-bold text-surface-900">
+                      {snap.uploadedDocumentsCount} document(s) uploaded
+                    </p>
+                    {snap.missingDocumentTypes && snap.missingDocumentTypes.length > 0 && (
+                      <p className="text-[11px] text-amber-700">
+                        Missing: {snap.missingDocumentTypes.join(", ")}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Warnings */}
+                {snap.warnings && snap.warnings.length > 0 && (
+                  <div className="space-y-1 text-xs">
+                    <span className="font-semibold text-amber-800 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                      Notices & Limitations:
+                    </span>
+                    <ul className="list-disc list-inside space-y-0.5 text-surface-600 text-[11px]">
+                      {snap.warnings.map((w: string, idx: number) => (
+                        <li key={idx}>{w}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Taxpayer Submitted Message */}
             <div className="space-y-1.5">
@@ -288,15 +461,16 @@ export default function AdminLeadDetailPage({
           </div>
         </div>
 
-        {/* Right: Update Status & Add Internal Note Form */}
+        {/* Right: Update Status, Assignment & Add Internal Note Form */}
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border border-surface-200 p-6 shadow-2xs space-y-5">
             <h3 className="text-base font-bold text-surface-900 border-b border-surface-100 pb-3 flex items-center gap-2">
               <UserCheck className="w-5 h-5 text-emerald-600" />
-              <span>Update Workflow</span>
+              <span>Lead Workflow & Assignment</span>
             </h3>
 
             <form onSubmit={handleUpdate} className="space-y-4">
+              {/* Status Selector */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-surface-700 uppercase tracking-wider block">
                   Lead Status
@@ -306,13 +480,53 @@ export default function AdminLeadDetailPage({
                   onChange={(e) => setNewStatus(e.target.value as ProfessionalLeadStatus)}
                   className="w-full px-3 py-2 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 font-medium text-surface-900"
                 >
-                  <option value="new">New (Awaiting Action)</option>
-                  <option value="contacted">Contacted</option>
+                  <option value="requested">Requested (New Review Request)</option>
+                  <option value="received">Received (Triaged by Operations)</option>
+                  <option value="assigned">Assigned (Assigned to CPA/EA)</option>
+                  <option value="contacted">Contacted (Outreach Made)</option>
                   <option value="in_progress">In Progress (Active Review)</option>
-                  <option value="closed">Closed (Finished)</option>
+                  <option value="completed">Completed (Review Finished)</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="new">New (Legacy)</option>
+                  <option value="closed">Closed (Legacy)</option>
                 </select>
               </div>
 
+              {/* Professional Assignment Fields */}
+              <div className="p-3.5 bg-purple-50/60 rounded-xl border border-purple-100 space-y-3">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-purple-950 uppercase tracking-wider">
+                  <UserPlus className="w-4 h-4 text-purple-600" />
+                  <span>Assign Professional</span>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-surface-700 block">
+                    Professional Full Name
+                  </label>
+                  <input
+                    type="text"
+                    value={assignedName}
+                    onChange={(e) => setAssignedName(e.target.value)}
+                    placeholder="e.g. Sarah Jenkins, CPA"
+                    className="w-full px-3 py-1.5 text-xs bg-white border border-surface-200 rounded-lg text-surface-900 focus:outline-hidden focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-surface-700 block">
+                    Professional ID / License
+                  </label>
+                  <input
+                    type="text"
+                    value={assignedId}
+                    onChange={(e) => setAssignedId(e.target.value)}
+                    placeholder="e.g. PRO-CPA-4029"
+                    className="w-full px-3 py-1.5 text-xs bg-white border border-surface-200 rounded-lg text-surface-900 focus:outline-hidden focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Add Internal Note */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-surface-700 uppercase tracking-wider block">
                   Add Internal Note
@@ -332,8 +546,8 @@ export default function AdminLeadDetailPage({
 
               <button
                 type="submit"
-                disabled={saving || (newStatus === lead.status && newNote.trim().length === 0)}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-xs transition-colors"
+                disabled={saving}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
               >
                 {saving ? (
                   <>
@@ -361,6 +575,18 @@ export default function AdminLeadDetailPage({
               <span>User ID:</span>
               <span className="font-mono text-surface-800">{lead.userId}</span>
             </div>
+            {lead.reviewType && (
+              <div className="flex justify-between">
+                <span>Review Type:</span>
+                <span className="font-semibold text-surface-800 uppercase">{lead.reviewType}</span>
+              </div>
+            )}
+            {lead.assignedProfessionalName && (
+              <div className="flex justify-between">
+                <span>Assigned Pro:</span>
+                <span className="font-semibold text-emerald-800">{lead.assignedProfessionalName}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span>Created:</span>
               <span>{new Date(lead.createdAt).toLocaleString()}</span>
