@@ -85,7 +85,7 @@ export interface DeductionEntry {
   subtype?: string;
   notes?: string;
   taxYear?: number;
-  status?: "applied_business" | "standard_deduction_used" | "unsupported_schedule_a" | "future_extension";
+  status?: "applied_business" | "standard_deduction_used" | "applied_itemized" | "applied_above_the_line" | "unsupported_schedule_a" | "future_extension";
 }
 
 export interface GuidedDeductionAnswers {

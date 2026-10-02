@@ -375,7 +375,8 @@ export function buildPreparationSessionDeterministicReply(
     lower.includes("standard deduction") ||
     lower.includes("expenses")
   ) {
-    const stdDeductionCents = calc
+    const isItemized = calc?.deductionType === "itemized";
+    const deductionUsedCents = calc
       ? calc.deductionUsedCents
       : summary.deductionsSummary?.standardDeductionCents ||
         (session.taxYear === 2025
@@ -386,20 +387,29 @@ export function buildPreparationSessionDeterministicReply(
     const expenseCents = summary.whatYouToldUs.expenseCents;
     const discoveredItemizedCents = summary.deductionsSummary?.discoveredItemizedCents || 0;
 
-    let text = `For tax year **${session.taxYear}** with filing status **${filingStatusFormatted}**, the deterministic tax engine applies the official IRS statutory Standard Deduction of **${formatCurrencyFromCents(stdDeductionCents)}** to reduce your taxable income.`;
+    let text = isItemized
+      ? `For tax year **${session.taxYear}** with filing status **${filingStatusFormatted}**, the deterministic tax engine applies **Schedule A Itemized Deductions** of **${formatCurrencyFromCents(deductionUsedCents)}** because they exceed your Standard Deduction.`
+      : `For tax year **${session.taxYear}** with filing status **${filingStatusFormatted}**, the deterministic tax engine applies the official IRS statutory Standard Deduction of **${formatCurrencyFromCents(deductionUsedCents)}** to reduce your taxable income.`;
 
-    text += `\n\n- **Standard Deduction**: ${formatCurrencyFromCents(stdDeductionCents)}`;
+    text += `\n\n- **Deduction Applied**: ${formatCurrencyFromCents(deductionUsedCents)} (${isItemized ? "Schedule A Itemized" : "Standard Deduction"})`;
     text += `\n- **Business Expenses**: ${formatCurrencyFromCents(expenseCents)}${expenseCents > 0 ? " (reduces net self-employment profit prior to income tax)" : ""}`;
 
-    if (discoveredItemizedCents > 0) {
-      text += `\n- Discovered Deductions: ${formatCurrencyFromCents(discoveredItemizedCents)} (The IRS standard deduction is used as it exceeds itemized deductions or is standard in baseline)`;
+    if (calc?.mileageDetails && calc.mileageDetails.mileageDeductionCents > 0) {
+      text += `\n- **Business Mileage**: ${formatCurrencyFromCents(calc.mileageDetails.mileageDeductionCents)} (${calc.mileageDetails.businessMiles.toLocaleString()} miles at the IRS rate)`;
+    }
+
+    if (calc?.aboveTheLineDeductions && calc.aboveTheLineDeductions.studentLoanInterestCents > 0) {
+      text += `\n- **Student Loan Interest**: ${formatCurrencyFromCents(calc.aboveTheLineDeductions.studentLoanInterestCents)} (above-the-line deduction under IRC § 221)`;
+    }
+
+    if (discoveredItemizedCents > 0 && !isItemized) {
+      text += `\n- Discovered Deductions: ${formatCurrencyFromCents(discoveredItemizedCents)} (The Standard Deduction was used because it provides a greater tax benefit)`;
     }
 
     if (calc?.selfEmploymentDetails?.deductibleHalfCents) {
       text += `\n\nYou also receive an above-the-line deduction of **${formatCurrencyFromCents(calc.selfEmploymentDetails.deductibleHalfCents)}** (50% of your self-employment tax), which reduces your Adjusted Gross Income (AGI).`;
     }
 
-    text += `\n\n*Notice: Complex itemized deductions (Schedule A) are not supported in this baseline version. The IRS Standard Deduction is used.*`;
     return text;
   }
 
@@ -414,7 +424,7 @@ export function buildPreparationSessionDeterministicReply(
   ) {
     if (!calc) {
       return (
-        `Your tax calculation has not been run yet. Once calculated, family tax credits (such as the Child Tax Credit, Credit for Other Dependents, and EITC) will be deterministically calculated by the tax engine.`
+        `Your tax calculation has not been run yet. Once calculated, family tax credits (such as the Child Tax Credit, Credit for Other Dependents, Child & Dependent Care Credit, and EITC) will be deterministically calculated by the tax engine.`
       );
     }
     const cr = calc.credits;
@@ -430,6 +440,9 @@ export function buildPreparationSessionDeterministicReply(
     }
     if (cr.creditForOtherDependentsCents > 0) {
       text += `- Credit for Other Dependents (ODC): ${formatCurrencyFromCents(cr.creditForOtherDependentsCents)} (${cr.otherDependentsCount} qualifying dependent(s))\n`;
+    }
+    if (cr.childAndDependentCareCreditCents && cr.childAndDependentCareCreditCents > 0) {
+      text += `- Child and Dependent Care Credit (CDCTC): ${formatCurrencyFromCents(cr.childAndDependentCareCreditCents)} (under IRC § 21)\n`;
     }
     if (cr.additionalChildTaxCreditCents > 0) {
       text += `- Additional Child Tax Credit (ACTC, Refundable): ${formatCurrencyFromCents(cr.additionalChildTaxCreditCents)}\n`;

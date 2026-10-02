@@ -139,8 +139,52 @@ export const RULES_2025: TaxYearRules = {
         },
       },
     },
+    childAndDependentCare: {
+      maxExpensesOnePersonCents: 300000, // $3,000 (IRC § 21(c)(1))
+      maxExpensesTwoOrMoreCents: 600000, // $6,000 (IRC § 21(c)(2))
+      maxQualifyingAge: 13, // Under age 13
+      disallowedForMfs: true, // IRC § 21(e)(2)
+      baseRate: 0.35, // 35% for AGI <= $15,000
+      minRate: 0.20, // 20% floor for AGI > $43,000
+      agiBaseThresholdCents: 1500000, // $15,000
+      agiStepCents: 200000, // $2,000 per 1% reduction
+      stepRateReduction: 0.01,
+    },
     get eitc() {
       return this.earnedIncomeCredit;
     },
+  },
+  mileage: {
+    standardRateCentsPerMile: 70, // 70.0¢ per mile (IRS Notice 2024-87)
+    hundredthsRateCents: 7000, // 70.0 * 100
+  },
+  studentLoanInterest: {
+    maxDeductionCents: 250000, // $2,500 statutory cap (IRC § 221(b)(1))
+    disallowedForMfs: true, // IRC § 221(f)(1)
+    phaseoutThresholdCents: {
+      single: 8500000, // $85,000 (IRS Rev. Proc. 2024-40 § 3.33)
+      married_filing_jointly: 17000000, // $170,000
+      married_filing_separately: 0,
+      head_of_household: 8500000, // $85,000
+      qualifying_surviving_spouse: 8500000, // $85,000
+    },
+    phaseoutRangeCents: {
+      single: 1500000, // $15,000 window ($85,000 - $100,000)
+      married_filing_jointly: 3000000, // $30,000 window ($170,000 - $200,000)
+      married_filing_separately: 0,
+      head_of_household: 1500000,
+      qualifying_surviving_spouse: 1500000,
+    },
+  },
+  itemizedDeductions: {
+    medicalAgiFloorRate: 0.075, // 7.5% of AGI (IRC § 213(a))
+    saltCapCents: {
+      single: 1000000, // $10,000 statutory cap (IRC § 164(b)(6))
+      married_filing_jointly: 1000000, // $10,000
+      married_filing_separately: 500000, // $5,000 MFS cap
+      head_of_household: 1000000, // $10,000
+      qualifying_surviving_spouse: 1000000, // $10,000
+    },
+    charitableCashAgiLimitRate: 0.60, // 60% of AGI (IRC § 170(b)(1)(G))
   },
 };

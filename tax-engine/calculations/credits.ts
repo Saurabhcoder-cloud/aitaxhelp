@@ -1,5 +1,6 @@
 import { TaxFilingStatus, TaxYear, TaxCreditsBreakdown, DependentInput } from "@/types/tax";
 import { getTaxRules } from "../rules";
+import { ChildCareCreditRules } from "../types";
 
 /**
  * Calculates taxpayer age as of December 31 of the tax year from YYYY-MM-DD.
@@ -91,6 +92,30 @@ export function isQualifyingOtherDependent(dependent: DependentInput, taxYear: T
 }
 
 /**
+ * Evaluates whether a dependent is a qualifying person for Child and Dependent Care Credit (IRC § 21).
+ * Must be under age 13 or permanently disabled.
+ */
+export function isQualifyingPersonForCdctc(dependent: DependentInput, taxYear: TaxYear): boolean {
+  if (dependent.claimedByOtherTaxpayer === true) return false;
+  if (dependent.isPermanentlyDisabled) return true;
+  const age = calculateAgeAtTaxYearEnd(dependent.dateOfBirth, taxYear);
+  return age < 13;
+}
+
+/**
+ * Computes the statutory CDCTC percentage rate based on AGI tiers under IRC § 21(a)(2).
+ */
+export function calculateCdctcRate(agiCents: number, rules: ChildCareCreditRules): number {
+  if (agiCents <= rules.agiBaseThresholdCents) {
+    return rules.baseRate;
+  }
+  const excessCents = agiCents - rules.agiBaseThresholdCents;
+  const steps = Math.ceil(excessCents / rules.agiStepCents);
+  const reducedRate = rules.baseRate - steps * rules.stepRateReduction;
+  return Math.max(rules.minRate, Math.round(reducedRate * 100) / 100);
+}
+
+/**
  * Counts qualifying children for EITC (under 19, or under 24 student, or permanently disabled).
  */
 export function countEitcQualifyingChildren(dependents: DependentInput[], taxYear: TaxYear): number {
@@ -116,18 +141,25 @@ export interface CalculateCreditsParams {
   agiCents?: number;
   adjustedGrossIncomeCents?: number;
   earnedIncomeCents: number;
-  taxBeforeCreditsCents: number;
+  taxBeforeCreditsCents?: number;
+  tentativeTaxCents?: number;
   dependents?: DependentInput[];
   options?: {
     investmentIncomeCents?: number;
     taxpayerAge?: number;
+    childCareExpensesCents?: number;
+    qualifyingCarePersonsCount?: number;
+    spouseEarnedIncomeCents?: number;
   };
   investmentIncomeCents?: number;
   taxpayerAge?: number;
+  childCareExpensesCents?: number;
+  qualifyingCarePersonsCount?: number;
+  spouseEarnedIncomeCents?: number;
 }
 
 /**
- * Deterministically calculates family tax credits (CTC, ODC, ACTC, EITC) in integer cents.
+ * Deterministically calculates family tax credits (CTC, ODC, CDCTC, ACTC, EITC) in integer cents.
  * Strictly adheres to IRS statutory rules without floating point precision errors.
  */
 export function calculateCredits(
@@ -144,6 +176,9 @@ export function calculateCredits(
   options?: {
     investmentIncomeCents?: number;
     taxpayerAge?: number;
+    childCareExpensesCents?: number;
+    qualifyingCarePersonsCount?: number;
+    spouseEarnedIncomeCents?: number;
   }
 ): TaxCreditsBreakdown;
 export function calculateCredits(
@@ -156,6 +191,9 @@ export function calculateCredits(
   options: {
     investmentIncomeCents?: number;
     taxpayerAge?: number;
+    childCareExpensesCents?: number;
+    qualifyingCarePersonsCount?: number;
+    spouseEarnedIncomeCents?: number;
   } = {}
 ): TaxCreditsBreakdown {
   if (typeof taxYearOrParams === "object" && taxYearOrParams !== null) {
@@ -164,11 +202,14 @@ export function calculateCredits(
     const status = p.filingStatus;
     const agi = p.agiCents ?? p.adjustedGrossIncomeCents ?? 0;
     const earned = p.earnedIncomeCents ?? 0;
-    const taxBefore = p.taxBeforeCreditsCents ?? 0;
+    const taxBefore = p.taxBeforeCreditsCents ?? p.tentativeTaxCents ?? 0;
     const deps = p.dependents ?? [];
     const opts = p.options ?? {
       investmentIncomeCents: p.investmentIncomeCents,
       taxpayerAge: p.taxpayerAge,
+      childCareExpensesCents: p.childCareExpensesCents,
+      qualifyingCarePersonsCount: p.qualifyingCarePersonsCount,
+      spouseEarnedIncomeCents: p.spouseEarnedIncomeCents,
     };
     return calculateCreditsInternal(year, status, agi, earned, taxBefore, deps, opts);
   }
@@ -194,6 +235,9 @@ function calculateCreditsInternal(
   options: {
     investmentIncomeCents?: number;
     taxpayerAge?: number;
+    childCareExpensesCents?: number;
+    qualifyingCarePersonsCount?: number;
+    spouseEarnedIncomeCents?: number;
   } = {}
 ): TaxCreditsBreakdown {
   const rules = getTaxRules(taxYear);
@@ -252,10 +296,51 @@ function calculateCreditsInternal(
 
   // 4. Non-Refundable Allocation (Limited to Tax Before Credits)
   const appliedOdcCents = Math.min(taxBeforeCreditsCents, effectiveOdcCents);
-  const remainingTaxLiability = Math.max(0, taxBeforeCreditsCents - appliedOdcCents);
-  const appliedCtcCents = Math.min(remainingTaxLiability, effectiveCtcCents);
+  const remainingTaxLiability1 = Math.max(0, taxBeforeCreditsCents - appliedOdcCents);
+  const appliedCtcCents = Math.min(remainingTaxLiability1, effectiveCtcCents);
+  const remainingTaxLiability2 = Math.max(0, remainingTaxLiability1 - appliedCtcCents);
 
-  const totalNonRefundableCreditsCents = appliedOdcCents + appliedCtcCents;
+  // 4b. Child and Dependent Care Credit (CDCTC - IRC § 21)
+  let appliedCdctcCents = 0;
+  const cdctcRules = creditRules.childAndDependentCare;
+  const rawChildCareExpenses = options.childCareExpensesCents ?? 0;
+  let qualifyingCarePersonsCount = 0;
+
+  if (cdctcRules && rawChildCareExpenses > 0) {
+    const detectedCareCount = dependents.filter((d) => isQualifyingPersonForCdctc(d, taxYear)).length;
+    qualifyingCarePersonsCount =
+      options.qualifyingCarePersonsCount !== undefined
+        ? options.qualifyingCarePersonsCount
+        : detectedCareCount;
+
+    if (
+      qualifyingCarePersonsCount > 0 &&
+      !(cdctcRules.disallowedForMfs && filingStatus === "married_filing_separately")
+    ) {
+      const maxExpenseLimitCents =
+        qualifyingCarePersonsCount === 1
+          ? cdctcRules.maxExpensesOnePersonCents
+          : cdctcRules.maxExpensesTwoOrMoreCents;
+
+      let earnedIncomeCapCents = earnedIncomeCents;
+      if (filingStatus === "married_filing_jointly" && options.spouseEarnedIncomeCents !== undefined) {
+        earnedIncomeCapCents = Math.min(earnedIncomeCents, options.spouseEarnedIncomeCents);
+      }
+
+      const allowableExpensesCents = Math.min(
+        rawChildCareExpenses,
+        maxExpenseLimitCents,
+        Math.max(0, earnedIncomeCapCents)
+      );
+
+      const applicableRate = calculateCdctcRate(adjustedGrossIncomeCents, cdctcRules);
+      const tentativeCdctcCents = Math.round(allowableExpensesCents * applicableRate);
+
+      appliedCdctcCents = Math.min(remainingTaxLiability2, tentativeCdctcCents);
+    }
+  }
+
+  const totalNonRefundableCreditsCents = appliedOdcCents + appliedCtcCents + appliedCdctcCents;
   const taxAfterNonRefundableCreditsCents = Math.max(0, taxBeforeCreditsCents - totalNonRefundableCreditsCents);
 
   // 5. Additional Child Tax Credit (ACTC - Refundable CTC under IRC § 24(d))
@@ -322,6 +407,7 @@ function calculateCreditsInternal(
   return {
     childTaxCreditCents: appliedCtcCents,
     creditForOtherDependentsCents: appliedOdcCents,
+    childAndDependentCareCreditCents: appliedCdctcCents,
     totalNonRefundableCreditsCents,
     taxAfterNonRefundableCreditsCents,
     additionalChildTaxCreditCents,
@@ -330,5 +416,6 @@ function calculateCreditsInternal(
     totalCreditsCents,
     qualifyingChildrenCount,
     otherDependentsCount,
+    qualifyingCarePersonsCount,
   };
 }

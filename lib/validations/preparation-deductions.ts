@@ -31,7 +31,7 @@ export const entrySchema = z
     notes: z.string().trim().max(500).optional(),
     taxYear: z.number().int().optional(),
     status: z
-      .enum(["applied_business", "standard_deduction_used", "unsupported_schedule_a", "future_extension"])
+      .enum(["applied_business", "standard_deduction_used", "applied_itemized", "applied_above_the_line", "unsupported_schedule_a", "future_extension"])
       .optional(),
   })
   .strict();

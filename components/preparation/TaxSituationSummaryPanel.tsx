@@ -296,7 +296,9 @@ export function TaxSituationSummaryPanel({
                   <p className="text-base font-bold text-surface-900 mt-0.5">
                     {formatCurrencyFromCents(calc.deductionUsedCents)}
                   </p>
-                  <p className="text-[11px] text-surface-500">Standard deduction</p>
+                  <p className="text-[11px] text-surface-500">
+                    {calc.deductionType === "itemized" ? "Itemized (Schedule A)" : "Standard deduction"}
+                  </p>
                 </div>
                 <div className="p-3 rounded-lg bg-surface-50 border border-surface-200">
                   <p className="text-xs text-surface-500 font-semibold uppercase">Taxable Income</p>
@@ -313,6 +315,41 @@ export function TaxSituationSummaryPanel({
                   <p className="text-[11px] text-surface-500">W-2 & 1099 paid</p>
                 </div>
               </div>
+
+              {/* Deductions & Adjustments Breakdown */}
+              {(calc.itemizedBreakdown || calc.mileageDetails || (calc.aboveTheLineDeductions && calc.aboveTheLineDeductions.studentLoanInterestCents > 0)) && (
+                <div className="p-3 rounded-lg bg-brand-50/50 border border-brand-200 text-xs text-surface-800 space-y-1.5">
+                  <p className="font-bold text-brand-950 uppercase tracking-wider text-[11px]">
+                    Deductions & Adjustments ({calc.deductionType === "itemized" ? "Itemized Deductions Applied" : "Standard Deduction Applied"})
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-xs">
+                    {calc.mileageDetails && calc.mileageDetails.mileageDeductionCents > 0 && (
+                      <div>
+                        <span className="text-surface-600">Business Mileage: </span>
+                        <span className="font-semibold text-surface-900">
+                          {formatCurrencyFromCents(calc.mileageDetails.mileageDeductionCents)} ({calc.mileageDetails.businessMiles.toLocaleString()} mi)
+                        </span>
+                      </div>
+                    )}
+                    {calc.aboveTheLineDeductions && calc.aboveTheLineDeductions.studentLoanInterestCents > 0 && (
+                      <div>
+                        <span className="text-surface-600">Student Loan Interest: </span>
+                        <span className="font-semibold text-surface-900">
+                          {formatCurrencyFromCents(calc.aboveTheLineDeductions.studentLoanInterestCents)} (Above-the-line)
+                        </span>
+                      </div>
+                    )}
+                    {calc.itemizedBreakdown && (
+                      <div>
+                        <span className="text-surface-600">Schedule A: </span>
+                        <span className="font-semibold text-surface-900">
+                          {formatCurrencyFromCents(calc.itemizedBreakdown.totalScheduleACents)} (SALT: {formatCurrencyFromCents(calc.itemizedBreakdown.allowableSaltCents)})
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Family & Tax Credits Breakdown */}
               {calc.credits && (calc.credits.totalCreditsCents > 0 || (calc.totalCreditsCents && calc.totalCreditsCents > 0)) && (
@@ -345,6 +382,14 @@ export function TaxSituationSummaryPanel({
                         <p className="text-surface-600">Credit for Other Dependents (ODC):</p>
                         <p className="font-semibold text-emerald-800">
                           {formatCurrencyFromCents(calc.credits.creditForOtherDependentsCents)} ({calc.credits.otherDependentsCount} dependent(s))
+                        </p>
+                      </div>
+                    )}
+                    {calc.credits.childAndDependentCareCreditCents && calc.credits.childAndDependentCareCreditCents > 0 && (
+                      <div>
+                        <p className="text-surface-600">Child & Dependent Care Credit (CDCTC):</p>
+                        <p className="font-semibold text-emerald-800">
+                          {formatCurrencyFromCents(calc.credits.childAndDependentCareCreditCents)}
                         </p>
                       </div>
                     )}

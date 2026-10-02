@@ -6,6 +6,7 @@ import {
   TaxYear,
   DependentInput,
   SpouseInput,
+  ScheduleAInput,
 } from "@/types/tax";
 import { HouseholdSnapshot } from "@/lib/preparation/household";
 import {
@@ -196,9 +197,88 @@ export function mapPreparationSessionToEngineInput(
         (spouse?.businessExpensesCents && spouse.businessExpensesCents > 0))
   );
 
+  // Phase 3: Extract business mileage
+  const businessMiles = session.deductionsSnapshot.guidedAnswers?.business?.milesDriven ?? 0;
+
+  // Phase 3: Extract student loan interest (above-the-line)
+  const studentLoanInterestCents =
+    session.deductionsSnapshot.guidedAnswers?.education?.studentLoanInterestCents ??
+    session.deductionsSnapshot.entries
+      .filter((e) => e.confirmed && e.category === "education_expenses")
+      .reduce((s, e) => s + e.amountCents, 0);
+
+  // Phase 3: Extract child care expenses (CDCTC)
+  const childCareExpensesCents =
+    session.deductionsSnapshot.guidedAnswers?.childcare?.childcareCents ??
+    session.deductionsSnapshot.entries
+      .filter((e) => e.confirmed && e.category === "childcare_expenses")
+      .reduce((s, e) => s + e.amountCents, 0);
+
+  // Phase 3: Extract Schedule A itemized deductions
+  const homeAnswers = session.deductionsSnapshot.guidedAnswers?.home;
+  const charityAnswers = session.deductionsSnapshot.guidedAnswers?.charity;
+  const medicalAnswers = session.deductionsSnapshot.guidedAnswers?.medical;
+  const stateLocalAnswers = session.deductionsSnapshot.guidedAnswers?.stateLocal;
+
+  const mortgageInterestCents =
+    homeAnswers?.mortgageInterestCents ??
+    session.deductionsSnapshot.entries
+      .filter((e) => e.confirmed && e.category === "mortgage_interest")
+      .reduce((s, e) => s + e.amountCents, 0);
+
+  const propertyTaxesCents =
+    homeAnswers?.propertyTaxesCents ??
+    session.deductionsSnapshot.entries
+      .filter((e) => e.confirmed && e.category === "property_taxes")
+      .reduce((s, e) => s + e.amountCents, 0);
+
+  const charityCashCents =
+    charityAnswers?.cashCents ??
+    session.deductionsSnapshot.entries
+      .filter((e) => e.confirmed && e.category === "charitable_cash")
+      .reduce((s, e) => s + e.amountCents, 0);
+
+  const charityNonCashCents =
+    charityAnswers?.nonCashCents ??
+    session.deductionsSnapshot.entries
+      .filter((e) => e.confirmed && e.category === "charitable_non_cash")
+      .reduce((s, e) => s + e.amountCents, 0);
+
+  const medicalExpensesCents =
+    medicalAnswers?.medicalExpensesCents ??
+    session.deductionsSnapshot.entries
+      .filter((e) => e.confirmed && e.category === "medical_dental")
+      .reduce((s, e) => s + e.amountCents, 0);
+
+  const stateLocalTaxCents =
+    stateLocalAnswers?.stateLocalTaxCents ??
+    session.deductionsSnapshot.entries
+      .filter((e) => e.confirmed && e.category === "state_local_taxes")
+      .reduce((s, e) => s + e.amountCents, 0);
+
+  const hasItemizedData =
+    mortgageInterestCents > 0 ||
+    propertyTaxesCents > 0 ||
+    charityCashCents > 0 ||
+    charityNonCashCents > 0 ||
+    medicalExpensesCents > 0 ||
+    stateLocalTaxCents > 0;
+
+  const scheduleA: ScheduleAInput | undefined = hasItemizedData
+    ? {
+        mortgageInterestCents,
+        realEstatePropertyTaxesCents: propertyTaxesCents,
+        charitableCashCents: charityCashCents,
+        charitableNonCashCents: charityNonCashCents,
+        medicalExpensesCents,
+        stateAndLocalIncomeTaxesCents: stateLocalTaxCents,
+      }
+    : undefined;
+
   const hasSelfEmployedOr1099 =
     gross1099IncomeCents > 0 ||
     businessExpensesCents > 0 ||
+    businessMiles > 0 ||
     session.incomeSnapshot.form1099s.length > 0 ||
     session.incomeSnapshot.activities.length > 0 ||
     session.incomeSnapshot.situations.some((situation) => situation !== "employer") ||
@@ -210,6 +290,10 @@ export function mapPreparationSessionToEngineInput(
       filingStatus: effectiveFilingStatus,
       gross1099IncomeCents,
       businessExpensesCents,
+      businessMiles: businessMiles > 0 ? businessMiles : undefined,
+      studentLoanInterestCents: studentLoanInterestCents > 0 ? studentLoanInterestCents : undefined,
+      childCareExpensesCents: childCareExpensesCents > 0 ? childCareExpensesCents : undefined,
+      scheduleA,
       w2WagesCents,
       federalWithholdingCents: totalWithholdingCents,
       hasOtherSelfEmploymentIncome:
@@ -231,6 +315,9 @@ export function mapPreparationSessionToEngineInput(
     otherIncomeCents: 0,
     federalWithholdingCents: totalW2WithholdingCents,
     itemizedDeductionCents: 0,
+    studentLoanInterestCents: studentLoanInterestCents > 0 ? studentLoanInterestCents : undefined,
+    childCareExpensesCents: childCareExpensesCents > 0 ? childCareExpensesCents : undefined,
+    scheduleA,
     dependents: dependents.length > 0 ? dependents : undefined,
     spouse,
   };

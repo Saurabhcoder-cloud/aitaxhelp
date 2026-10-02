@@ -12,6 +12,9 @@ import { calculateProgressiveTax } from "./calculations/income-tax";
 import { calculateSelfEmploymentTax } from "./calculations/self-employment";
 import { calculateQuarterlySchedule } from "./calculations/quarterly";
 import { calculateCredits } from "./calculations/credits";
+import { calculateMileageDeduction } from "./calculations/mileage";
+import { calculateStudentLoanInterestDeduction } from "./calculations/student-loan-interest";
+import { calculateItemizedDeductions } from "./calculations/itemized-deductions";
 
 export const ENGINE_VERSION = "1.1.0-production-baseline";
 
@@ -43,6 +46,14 @@ function getStandardWarnings(): TaxWarning[] {
 export function calculateIncomeTax(
   input: IncomeTaxCalculationInput
 ): TaxCalculationResult {
+  if (
+    ((input as any).gross1099IncomeCents && (input as any).gross1099IncomeCents > 0) ||
+    ((input as any).businessMiles && (input as any).businessMiles > 0) ||
+    ((input as any).businessExpensesCents && (input as any).businessExpensesCents > 0)
+  ) {
+    return calculateSelfEmployedTax(input as unknown as SelfEmployedCalculationInput);
+  }
+
   const rules = getTaxRules(input.taxYear);
   const warnings = getStandardWarnings();
 
@@ -51,18 +62,42 @@ export function calculateIncomeTax(
   const grossIncomeCents = primaryW2Cents + spouseW2Cents + (input.otherIncomeCents ?? 0);
   const withholdingCents = input.federalWithholdingCents ?? input.withholdingCents ?? 0;
 
-  // Deductions: Standard deduction in current baseline
+  // Above-the-line deduction: Student Loan Interest (IRC § 221)
+  let studentLoanInterestDeductionCents = 0;
+  if (input.studentLoanInterestCents && input.studentLoanInterestCents > 0) {
+    const sliResult = calculateStudentLoanInterestDeduction({
+      taxYear: input.taxYear,
+      filingStatus: input.filingStatus,
+      interestPaidCents: input.studentLoanInterestCents,
+      magiCents: grossIncomeCents,
+      isTaxpayerDependent: input.isTaxpayerDependent,
+    });
+    studentLoanInterestDeductionCents = sliResult.deductionCents;
+    if (sliResult.isDisallowed && sliResult.disallowedReason) {
+      warnings.push({
+        code: "STUDENT_LOAN_INTEREST_DISALLOWED",
+        level: "info",
+        message: sliResult.disallowedReason,
+      });
+    }
+  }
+
+  const totalAboveTheLineCents = studentLoanInterestDeductionCents;
+  const adjustedGrossIncomeCents = Math.max(0, grossIncomeCents - totalAboveTheLineCents);
+
+  // Deductions: Resolves Standard vs Schedule A Itemized
   const deduction = resolveDeductions(
     input.taxYear,
     input.filingStatus,
-    input.itemizedDeductionCents ?? 0
+    input.itemizedDeductionCents ?? 0,
+    input.scheduleA,
+    adjustedGrossIncomeCents
   );
 
   if (deduction.warning) {
     warnings.push(deduction.warning);
   }
 
-  const adjustedGrossIncomeCents = grossIncomeCents;
   const taxableIncomeCents = Math.max(0, adjustedGrossIncomeCents - deduction.deductionUsedCents);
 
   // Progressive Tax Bracket computation
@@ -74,7 +109,7 @@ export function calculateIncomeTax(
 
   const taxBeforeCreditsCents = federalIncomeTaxCents;
 
-  // Deterministic Credits Computation (CTC, ODC, ACTC, EITC)
+  // Deterministic Credits Computation (CTC, ODC, CDCTC, ACTC, EITC)
   const earnedIncomeCents = grossIncomeCents;
   const creditsOutput = calculateCredits(
     input.taxYear,
@@ -83,7 +118,12 @@ export function calculateIncomeTax(
     earnedIncomeCents,
     taxBeforeCreditsCents,
     input.dependents ?? [],
-    { investmentIncomeCents: input.investmentIncomeCents }
+    {
+      investmentIncomeCents: input.investmentIncomeCents,
+      childCareExpensesCents: input.childCareExpensesCents,
+      qualifyingCarePersonsCount: input.qualifyingCarePersonsCount,
+      spouseEarnedIncomeCents: spouseW2Cents,
+    }
   );
 
   const totalTaxLiabilityCents = creditsOutput.taxAfterNonRefundableCreditsCents;
@@ -112,6 +152,13 @@ export function calculateIncomeTax(
     deductionType: deduction.deductionType,
     taxableIncomeCents,
 
+    itemizedBreakdown: deduction.itemizedBreakdown,
+    aboveTheLineDeductions: {
+      studentLoanInterestCents: studentLoanInterestDeductionCents,
+      deductibleHalfSeTaxCents: 0,
+      totalAboveTheLineCents,
+    },
+
     federalIncomeTaxCents,
     selfEmploymentTaxCents: 0,
     totalTaxLiabilityCents,
@@ -137,7 +184,7 @@ export function calculateIncomeTax(
     taxableIncome: taxableIncomeCents,
     incomeTax: federalIncomeTaxCents,
     selfEmploymentTax: 0,
-    aboveTheLineDeduction: 0,
+    aboveTheLineDeduction: totalAboveTheLineCents,
   };
 }
 
@@ -151,7 +198,8 @@ export function calculateSelfEmployedTax(
   const rules = getTaxRules(input.taxYear);
   const warnings = getStandardWarnings();
 
-  const w2WagesCents = input.w2WagesCents ?? 0;
+  const w2WagesCents =
+    input.w2WagesCents ?? (input as { w2IncomeCents?: number }).w2IncomeCents ?? 0;
   const withholdingCents = input.federalWithholdingCents ?? 0;
 
   const spouseW2WagesCents =
@@ -171,11 +219,35 @@ export function calculateSelfEmployedTax(
     input.spouse?.businessExpensesCents ??
     0;
 
+  // 0. Business Mileage Deduction (Schedule C Line 9)
+  let mileageDetails:
+    | { businessMiles: number; ratePerMileCents: number; mileageDeductionCents: number }
+    | undefined;
+  let primaryMileageDeductionCents = 0;
+  if (input.businessMiles && input.businessMiles > 0) {
+    const mRes = calculateMileageDeduction(input.taxYear, input.businessMiles);
+    primaryMileageDeductionCents = mRes.deductionCents;
+    mileageDetails = {
+      businessMiles: mRes.businessMiles,
+      ratePerMileCents: mRes.ratePerMileCents,
+      mileageDeductionCents: mRes.deductionCents,
+    };
+  }
+
+  let spouseMileageDeductionCents = 0;
+  if (input.spouseBusinessMiles && input.spouseBusinessMiles > 0) {
+    const smRes = calculateMileageDeduction(input.taxYear, input.spouseBusinessMiles);
+    spouseMileageDeductionCents = smRes.deductionCents;
+  }
+
+  const effectivePrimaryExpensesCents = (input.businessExpensesCents ?? 0) + primaryMileageDeductionCents;
+  const effectiveSpouseExpensesCents = (spouseExpensesCents ?? 0) + spouseMileageDeductionCents;
+
   // 1. Calculate Self-Employment Tax (Schedule SE) for Primary Taxpayer
   const seOutput = calculateSelfEmploymentTax(
     input.taxYear,
     input.gross1099IncomeCents,
-    input.businessExpensesCents,
+    effectivePrimaryExpensesCents,
     w2WagesCents
   );
 
@@ -188,7 +260,7 @@ export function calculateSelfEmployedTax(
     const spouseSeOutput = calculateSelfEmploymentTax(
       input.taxYear,
       spouse1099GrossCents,
-      spouseExpensesCents,
+      effectiveSpouseExpensesCents,
       spouseW2WagesCents
     );
     spouseSeTaxCents = spouseSeOutput.totalSelfEmploymentTaxCents;
@@ -199,7 +271,7 @@ export function calculateSelfEmployedTax(
   const totalSelfEmploymentTaxCents = seOutput.totalSelfEmploymentTaxCents + spouseSeTaxCents;
   const totalDeductibleHalfCents = seOutput.deductibleHalfCents + spouseDeductibleHalfCents;
 
-  if (input.businessExpensesCents > input.gross1099IncomeCents) {
+  if (effectivePrimaryExpensesCents > input.gross1099IncomeCents) {
     warnings.push({
       code: "BUSINESS_LOSS_DETECTED",
       level: "warning",
@@ -211,11 +283,41 @@ export function calculateSelfEmployedTax(
   const grossIncomeCents =
     w2WagesCents + spouseW2WagesCents + seOutput.netSelfEmploymentProfitCents + spouseNetProfitCents;
 
-  // Above-the-line deduction: 50% of self-employment tax reduces AGI
-  const adjustedGrossIncomeCents = Math.max(0, grossIncomeCents - totalDeductibleHalfCents);
+  // Above-the-line deduction: 50% of self-employment tax + Student Loan Interest
+  let studentLoanInterestDeductionCents = 0;
+  const magiBeforeSli = Math.max(0, grossIncomeCents - totalDeductibleHalfCents);
+  if (input.studentLoanInterestCents && input.studentLoanInterestCents > 0) {
+    const sliResult = calculateStudentLoanInterestDeduction({
+      taxYear: input.taxYear,
+      filingStatus: input.filingStatus,
+      interestPaidCents: input.studentLoanInterestCents,
+      magiCents: magiBeforeSli,
+      isTaxpayerDependent: input.isTaxpayerDependent,
+    });
+    studentLoanInterestDeductionCents = sliResult.deductionCents;
+    if (sliResult.isDisallowed && sliResult.disallowedReason) {
+      warnings.push({
+        code: "STUDENT_LOAN_INTEREST_DISALLOWED",
+        level: "info",
+        message: sliResult.disallowedReason,
+      });
+    }
+  }
 
-  // 3. Deductions (Standard Deduction for filing status)
-  const deduction = resolveDeductions(input.taxYear, input.filingStatus, 0);
+  const totalAboveTheLineDeduction = totalDeductibleHalfCents + studentLoanInterestDeductionCents;
+  const adjustedGrossIncomeCents = Math.max(0, grossIncomeCents - totalAboveTheLineDeduction);
+
+  // 3. Deductions (Resolves Standard vs Schedule A Itemized)
+  const deduction = resolveDeductions(
+    input.taxYear,
+    input.filingStatus,
+    0,
+    input.scheduleA,
+    adjustedGrossIncomeCents
+  );
+  if (deduction.warning) {
+    warnings.push(deduction.warning);
+  }
   const taxableIncomeCents = Math.max(0, adjustedGrossIncomeCents - deduction.deductionUsedCents);
 
   // 4. Progressive Federal Income Tax
@@ -227,9 +329,10 @@ export function calculateSelfEmployedTax(
 
   const taxBeforeCreditsCents = federalIncomeTaxCents;
 
-  // 5. Deterministic Credits Computation (CTC, ODC, ACTC, EITC)
+  // 5. Deterministic Credits Computation (CTC, ODC, CDCTC, ACTC, EITC)
   const earnedIncomeCents =
     w2WagesCents + spouseW2WagesCents + seOutput.netSelfEmploymentProfitCents + spouseNetProfitCents;
+  const spouseEarnedCents = spouseW2WagesCents + spouseNetProfitCents;
   const creditsOutput = calculateCredits(
     input.taxYear,
     input.filingStatus,
@@ -237,7 +340,12 @@ export function calculateSelfEmployedTax(
     earnedIncomeCents,
     taxBeforeCreditsCents,
     input.dependents ?? [],
-    { investmentIncomeCents: input.investmentIncomeCents }
+    {
+      investmentIncomeCents: input.investmentIncomeCents,
+      childCareExpensesCents: input.childCareExpensesCents,
+      qualifyingCarePersonsCount: input.qualifyingCarePersonsCount,
+      spouseEarnedIncomeCents: spouseEarnedCents,
+    }
   );
 
   // Total Tax Liability = Federal Income Tax after non-refundable credits + Self Employment Tax
@@ -268,6 +376,14 @@ export function calculateSelfEmployedTax(
     deductionType: deduction.deductionType,
     taxableIncomeCents,
 
+    itemizedBreakdown: deduction.itemizedBreakdown,
+    aboveTheLineDeductions: {
+      studentLoanInterestCents: studentLoanInterestDeductionCents,
+      deductibleHalfSeTaxCents: totalDeductibleHalfCents,
+      totalAboveTheLineCents: totalAboveTheLineDeduction,
+    },
+    mileageDetails,
+
     federalIncomeTaxCents,
     selfEmploymentTaxCents: totalSelfEmploymentTaxCents,
     totalTaxLiabilityCents,
@@ -292,6 +408,7 @@ export function calculateSelfEmployedTax(
       medicareTaxCents: seOutput.medicareTaxCents,
       deductibleHalfCents: seOutput.deductibleHalfCents,
     },
+    netProfitCents: seOutput.netSelfEmploymentProfitCents,
 
     warnings,
 
@@ -301,7 +418,7 @@ export function calculateSelfEmployedTax(
     taxableIncome: taxableIncomeCents,
     incomeTax: federalIncomeTaxCents,
     selfEmploymentTax: seOutput.totalSelfEmploymentTaxCents,
-    aboveTheLineDeduction: seOutput.deductibleHalfCents,
+    aboveTheLineDeduction: totalAboveTheLineDeduction,
   };
 }
 
@@ -396,3 +513,11 @@ export function calculateFederalTaxes(input: {
 
 export * from "./types";
 export * from "./rules";
+export * from "./calculations/mileage";
+export * from "./calculations/student-loan-interest";
+export * from "./calculations/itemized-deductions";
+export * from "./calculations/credits";
+export * from "./calculations/deductions";
+export * from "./calculations/income-tax";
+export * from "./calculations/self-employment";
+export * from "./calculations/quarterly";

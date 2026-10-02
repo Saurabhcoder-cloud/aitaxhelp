@@ -71,9 +71,34 @@ export interface SpouseInput {
   spouseBusinessExpensesCents?: number;
 }
 
+export interface ScheduleAInput {
+  medicalExpensesCents?: number;
+  stateAndLocalIncomeTaxesCents?: number;
+  stateAndLocalSalesTaxesCents?: number;
+  realEstatePropertyTaxesCents?: number;
+  personalPropertyTaxesCents?: number;
+  saltTaxesCents?: number;
+  mortgageInterestCents?: number;
+  charitableCashCents?: number;
+  charitableNonCashCents?: number;
+}
+
+export interface ScheduleABreakdown {
+  medicalExpensesCents: number;
+  medicalAgiThresholdCents: number;
+  allowableMedicalCents: number;
+  saltTotalClaimedCents: number;
+  saltCapCents: number;
+  allowableSaltCents: number;
+  allowableMortgageInterestCents: number;
+  allowableCharitableCents: number;
+  totalScheduleACents: number;
+}
+
 export interface TaxCreditsBreakdown {
   childTaxCreditCents: number; // Non-refundable CTC
   creditForOtherDependentsCents: number; // Non-refundable ODC
+  childAndDependentCareCreditCents?: number; // Non-refundable CDCTC (IRC § 21)
   totalNonRefundableCreditsCents: number;
   taxAfterNonRefundableCreditsCents: number;
   additionalChildTaxCreditCents: number; // Refundable ACTC
@@ -82,6 +107,7 @@ export interface TaxCreditsBreakdown {
   totalCreditsCents: number;
   qualifyingChildrenCount: number;
   otherDependentsCount: number;
+  qualifyingCarePersonsCount?: number;
 }
 
 // Income Tax Calculator Input (Standard W-2 & Federal)
@@ -97,6 +123,12 @@ export interface IncomeTaxCalculationInput {
   dependents?: DependentInput[];
   spouse?: SpouseInput;
   investmentIncomeCents?: number;
+  // Phase 3 Extensions
+  studentLoanInterestCents?: number;
+  childCareExpensesCents?: number;
+  qualifyingCarePersonsCount?: number;
+  scheduleA?: ScheduleAInput;
+  isTaxpayerDependent?: boolean;
 }
 
 // Self-Employed / 1099 Tax Calculation Input
@@ -114,6 +146,14 @@ export interface SelfEmployedCalculationInput {
   spouseW2WagesCents?: number;
   spouseGross1099IncomeCents?: number;
   spouseBusinessExpensesCents?: number;
+  // Phase 3 Extensions
+  businessMiles?: number;
+  spouseBusinessMiles?: number;
+  studentLoanInterestCents?: number;
+  childCareExpensesCents?: number;
+  qualifyingCarePersonsCount?: number;
+  scheduleA?: ScheduleAInput;
+  isTaxpayerDependent?: boolean;
 }
 
 // Quarterly Estimated Tax Calculation Input
@@ -141,8 +181,25 @@ export interface TaxCalculationResult {
   grossIncomeCents: number;
   adjustedGrossIncomeCents: number;
   deductionUsedCents: number;
-  deductionType: "standard";
+  deductionType: "standard" | "itemized";
   taxableIncomeCents: number;
+
+  // Schedule A Itemized Breakdown if evaluated
+  itemizedBreakdown?: ScheduleABreakdown;
+
+  // Above-the-Line Deductions Breakdown
+  aboveTheLineDeductions?: {
+    studentLoanInterestCents: number;
+    deductibleHalfSeTaxCents: number;
+    totalAboveTheLineCents: number;
+  };
+
+  // Standard Mileage Details if applicable
+  mileageDetails?: {
+    businessMiles: number;
+    ratePerMileCents: number;
+    mileageDeductionCents: number;
+  };
 
   // Tax Liabilities
   federalIncomeTaxCents: number;
@@ -198,6 +255,7 @@ export interface TaxCalculationResult {
   selfEmploymentTax?: number;
   aboveTheLineDeduction?: number;
   totalIncomeCents?: number;
+  netProfitCents?: number;
 }
 
 // Calculation Input Snapshot Union & Normalizer

@@ -11,7 +11,7 @@ import {
 } from "@/lib/preparation/deductions";
 import { isCompleteDeductionDiscovery } from "@/lib/validations/preparation-deductions";
 import { PreparationProfileSnapshot, PreparationStep, PreparationStepMap, PREPARATION_STEPS } from "@/lib/preparation/steps";
-import { TaxCalculationResult, CalculatorType, TaxWarning, TaxCreditsBreakdown, TaxYear } from "@/types/tax";
+import { TaxCalculationResult, CalculatorType, TaxWarning, TaxCreditsBreakdown, TaxYear, ScheduleABreakdown } from "@/types/tax";
 import { getTaxRules } from "@/tax-engine/rules";
 import { HouseholdSnapshot, getHouseholdSummary, HouseholdSummary, FILING_STATUS_LABELS } from "@/lib/preparation/household";
 
@@ -33,7 +33,7 @@ export interface TaxSituationSummaryCalculation {
   adjustedGrossIncomeCents: number;
   taxableIncomeCents: number;
   deductionUsedCents: number;
-  deductionType: "standard";
+  deductionType: "standard" | "itemized";
   federalIncomeTaxCents: number;
   selfEmploymentTaxCents: number;
   totalTaxLiabilityCents: number;
@@ -52,6 +52,17 @@ export interface TaxSituationSummaryCalculation {
     estimatedAmountOwedCents: number;
   };
   warnings: TaxWarning[];
+  itemizedBreakdown?: ScheduleABreakdown;
+  aboveTheLineDeductions?: {
+    studentLoanInterestCents: number;
+    deductibleHalfSeTaxCents: number;
+    totalAboveTheLineCents: number;
+  };
+  mileageDetails?: {
+    businessMiles: number;
+    ratePerMileCents: number;
+    mileageDeductionCents: number;
+  };
 }
 
 export interface TaxSituationSummary {
@@ -81,6 +92,7 @@ export interface TaxSituationSummary {
     totalCreditsCents: number;
     childTaxCreditCents: number;
     creditForOtherDependentsCents: number;
+    childAndDependentCareCreditCents?: number;
     additionalChildTaxCreditCents: number;
     earnedIncomeCreditCents: number;
     finalFederalTaxLiabilityCents: number;
@@ -89,10 +101,14 @@ export interface TaxSituationSummary {
     standardDeductionCents: number;
     businessExpensesCents: number;
     discoveredItemizedCents: number;
-    deductionTypeUsed: "standard";
+    deductionTypeUsed: "standard" | "itemized";
     deductionUsedCents: number;
     itemizedCategoriesCount: number;
     unsupportedDeductionsNotice?: string;
+    itemizedBreakdown?: ScheduleABreakdown;
+    mileageDeductionCents?: number;
+    businessMiles?: number;
+    studentLoanInterestDeductionCents?: number;
   };
 
   // Actual calculation results populated once calculation is executed
@@ -298,12 +314,16 @@ export function buildTaxSituationSummary(input: {
       marginalTaxBracket: calc.marginalTaxBracket,
       refundOrBalanceDue,
       warnings: calc.warnings,
+      itemizedBreakdown: calc.itemizedBreakdown,
+      aboveTheLineDeductions: calc.aboveTheLineDeductions,
+      mileageDetails: calc.mileageDetails,
     };
 
     if (calc.credits || calc.totalCreditsCents) {
       const cr = calc.credits || {
         childTaxCreditCents: 0,
         creditForOtherDependentsCents: 0,
+        childAndDependentCareCreditCents: 0,
         additionalChildTaxCreditCents: 0,
         earnedIncomeCreditCents: 0,
         totalCreditsCents: calc.totalCreditsCents || 0,
@@ -315,6 +335,7 @@ export function buildTaxSituationSummary(input: {
         totalCreditsCents: calc.totalCreditsCents ?? cr.totalCreditsCents,
         childTaxCreditCents: cr.childTaxCreditCents,
         creditForOtherDependentsCents: cr.creditForOtherDependentsCents,
+        childAndDependentCareCreditCents: cr.childAndDependentCareCreditCents,
         additionalChildTaxCreditCents: cr.additionalChildTaxCreditCents,
         earnedIncomeCreditCents: cr.earnedIncomeCreditCents,
         finalFederalTaxLiabilityCents: calc.totalTaxLiabilityCents ?? calc.federalIncomeTaxCents,
@@ -345,19 +366,29 @@ export function buildTaxSituationSummary(input: {
   const rules = getTaxRules(input.taxYear as TaxYear);
   const standardDeductionCents = rules.standardDeductions[effectiveFilingStatus] ?? 15_000_00;
   const discoveredItemizedCents = input.deductions.saved ? itemizedDeductionTotalCents(input.deductions) : 0;
+  const deductionTypeUsed: "standard" | "itemized" =
+    calc?.deductionType ?? (discoveredItemizedCents > standardDeductionCents ? "itemized" : "standard");
+  const deductionUsedCents =
+    calc?.deductionUsedCents ??
+    (deductionTypeUsed === "itemized" ? discoveredItemizedCents : standardDeductionCents);
+
   const deductionsSummary: TaxSituationSummary["deductionsSummary"] = {
     standardDeductionCents,
     businessExpensesCents: expenseCents,
     discoveredItemizedCents,
-    deductionTypeUsed: "standard",
-    deductionUsedCents: calc?.deductionUsedCents ?? standardDeductionCents,
+    deductionTypeUsed,
+    deductionUsedCents,
     itemizedCategoriesCount: input.deductions.entries.filter(
       (e) => e.confirmed && isItemizedDeductionCategory(e.category)
     ).length,
     unsupportedDeductionsNotice:
-      discoveredItemizedCents > 0
-        ? "Itemized deductions (Schedule A) were discovered, but the official IRS standard deduction was applied by the deterministic engine."
+      deductionTypeUsed === "standard" && discoveredItemizedCents > 0
+        ? "The IRS standard deduction was applied because it provided a greater tax benefit than itemizing."
         : undefined,
+    itemizedBreakdown: calc?.itemizedBreakdown,
+    mileageDeductionCents: calc?.mileageDetails?.mileageDeductionCents,
+    businessMiles: calc?.mileageDetails?.businessMiles ?? input.deductions.guidedAnswers?.business?.milesDriven,
+    studentLoanInterestDeductionCents: calc?.aboveTheLineDeductions?.studentLoanInterestCents,
   };
 
   const informationReceived = [
@@ -380,7 +411,9 @@ export function buildTaxSituationSummary(input: {
       : input.deductions.saved && input.deductions.hasBusinessExpenses
       ? ["Business expenses entered"]
       : []),
-    ...(input.deductions.saved && discoveredItemizedCents > 0
+    ...(calc?.deductionType === "itemized"
+      ? [`Schedule A Itemized deductions applied: $${(calc.deductionUsedCents / 100).toLocaleString()} (exceeds standard deduction)`]
+      : input.deductions.saved && discoveredItemizedCents > 0
       ? [`Discovered deductions: $${(discoveredItemizedCents / 100).toLocaleString()} (Standard deduction applied)`]
       : []),
     ...(input.deductions.saved && input.deductions.standardDeductionAcknowledged
@@ -389,6 +422,15 @@ export function buildTaxSituationSummary(input: {
     ...(calc ? ["Deterministic federal tax calculation completed"] : []),
     ...(calc?.totalCreditsCents && calc.totalCreditsCents > 0
       ? [`Family credits applied: $${(calc.totalCreditsCents / 100).toLocaleString()}`]
+      : []),
+    ...(calc?.mileageDetails && calc.mileageDetails.mileageDeductionCents > 0
+      ? [`Business mileage deduction: $${(calc.mileageDetails.mileageDeductionCents / 100).toLocaleString()} (${calc.mileageDetails.businessMiles.toLocaleString()} miles)`]
+      : []),
+    ...(calc?.aboveTheLineDeductions && calc.aboveTheLineDeductions.studentLoanInterestCents > 0
+      ? [`Student loan interest deduction: $${(calc.aboveTheLineDeductions.studentLoanInterestCents / 100).toLocaleString()}`]
+      : []),
+    ...(calc?.credits?.childAndDependentCareCreditCents && calc.credits.childAndDependentCareCreditCents > 0
+      ? [`Child and dependent care credit: $${(calc.credits.childAndDependentCareCreditCents / 100).toLocaleString()}`]
       : []),
   ];
 
