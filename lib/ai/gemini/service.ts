@@ -377,17 +377,23 @@ export function buildPreparationSessionDeterministicReply(
   ) {
     const stdDeductionCents = calc
       ? calc.deductionUsedCents
-      : session.taxYear === 2025
-      ? session.profileSnapshot.filingStatus === "married_filing_jointly"
-        ? 30_000_00
-        : 15_000_00
-      : 14_600_00;
+      : summary.deductionsSummary?.standardDeductionCents ||
+        (session.taxYear === 2025
+          ? session.profileSnapshot.filingStatus === "married_filing_jointly"
+            ? 31_500_00
+            : 15_750_00
+          : 14_600_00);
     const expenseCents = summary.whatYouToldUs.expenseCents;
+    const discoveredItemizedCents = summary.deductionsSummary?.discoveredItemizedCents || 0;
 
     let text = `For tax year **${session.taxYear}** with filing status **${filingStatusFormatted}**, the deterministic tax engine applies the official IRS statutory Standard Deduction of **${formatCurrencyFromCents(stdDeductionCents)}** to reduce your taxable income.`;
 
     text += `\n\n- **Standard Deduction**: ${formatCurrencyFromCents(stdDeductionCents)}`;
     text += `\n- **Business Expenses**: ${formatCurrencyFromCents(expenseCents)}${expenseCents > 0 ? " (reduces net self-employment profit prior to income tax)" : ""}`;
+
+    if (discoveredItemizedCents > 0) {
+      text += `\n- Discovered Deductions: ${formatCurrencyFromCents(discoveredItemizedCents)} (The IRS standard deduction is used as it exceeds itemized deductions or is standard in baseline)`;
+    }
 
     if (calc?.selfEmploymentDetails?.deductibleHalfCents) {
       text += `\n\nYou also receive an above-the-line deduction of **${formatCurrencyFromCents(calc.selfEmploymentDetails.deductibleHalfCents)}** (50% of your self-employment tax), which reduces your Adjusted Gross Income (AGI).`;

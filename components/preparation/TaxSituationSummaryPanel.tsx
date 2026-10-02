@@ -140,10 +140,15 @@ export function TaxSituationSummaryPanel({
               <div className="p-2.5 rounded-lg bg-surface-50 border border-surface-200 space-y-1">
                 <p className="text-xs text-surface-500 uppercase tracking-wider font-semibold">Deductions & Expenses</p>
                 <p className="text-sm font-medium text-surface-900">
-                  Expenses: {formatCurrencyFromCents(summary.whatYouToldUs.expenseCents)}
+                  Biz Costs: {formatCurrencyFromCents(summary.whatYouToldUs.expenseCents)}
                 </p>
+                {summary.deductionsSummary && summary.deductionsSummary.discoveredItemizedCents > 0 && (
+                  <p className="text-xs text-brand-700 font-medium">
+                    Discovered: {formatCurrencyFromCents(summary.deductionsSummary.discoveredItemizedCents)}
+                  </p>
+                )}
                 <p className="text-xs text-surface-600 mt-1">
-                  Standard deduction applied automatically by engine.
+                  Std Deduction: {formatCurrencyFromCents(summary.deductionsSummary?.standardDeductionCents ?? 15_750_00)}
                 </p>
               </div>
             </div>

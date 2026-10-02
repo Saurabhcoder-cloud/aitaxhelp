@@ -129,6 +129,7 @@ function readDeductions(value: unknown): DeductionDiscovery {
         : null,
     standardDeductionAcknowledged: Boolean(record.standardDeductionAcknowledged),
     entries: Array.isArray(record.entries) ? record.entries : [],
+    guidedAnswers: record.guidedAnswers || {},
   };
 }
 
@@ -532,6 +533,7 @@ export class TaxPreparationSessionStore {
       hasBusinessExpenses: parsed.hasBusinessExpenses,
       standardDeductionAcknowledged: parsed.standardDeductionAcknowledged,
       entries: parsed.entries,
+      guidedAnswers: parsed.guidedAnswers,
     };
     const check = isCompleteDeductionDiscovery(discovery, current.incomeSnapshot);
     if (!check.success) {

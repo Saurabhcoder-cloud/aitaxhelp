@@ -1,10 +1,18 @@
 import { IncomeDiscovery, activityExpenseCents } from "@/lib/preparation/income";
 import { isCompleteIncomeDiscovery } from "@/lib/validations/preparation-income";
 import { DocumentsSnapshot } from "@/lib/preparation/documents";
-import { DeductionDiscovery, deductionExpenseCents, incomeSupportsBusinessExpenses } from "@/lib/preparation/deductions";
+import {
+  DeductionDiscovery,
+  deductionExpenseCents,
+  incomeSupportsBusinessExpenses,
+  isBusinessDeductionCategory,
+  isItemizedDeductionCategory,
+  itemizedDeductionTotalCents,
+} from "@/lib/preparation/deductions";
 import { isCompleteDeductionDiscovery } from "@/lib/validations/preparation-deductions";
 import { PreparationProfileSnapshot, PreparationStep, PreparationStepMap, PREPARATION_STEPS } from "@/lib/preparation/steps";
 import { TaxCalculationResult, CalculatorType, TaxWarning, TaxCreditsBreakdown, TaxYear } from "@/types/tax";
+import { getTaxRules } from "@/tax-engine/rules";
 import { HouseholdSnapshot, getHouseholdSummary, HouseholdSummary, FILING_STATUS_LABELS } from "@/lib/preparation/household";
 
 export interface CalculationReadiness {
@@ -76,6 +84,15 @@ export interface TaxSituationSummary {
     additionalChildTaxCreditCents: number;
     earnedIncomeCreditCents: number;
     finalFederalTaxLiabilityCents: number;
+  };
+  deductionsSummary?: {
+    standardDeductionCents: number;
+    businessExpensesCents: number;
+    discoveredItemizedCents: number;
+    deductionTypeUsed: "standard";
+    deductionUsedCents: number;
+    itemizedCategoriesCount: number;
+    unsupportedDeductionsNotice?: string;
   };
 
   // Actual calculation results populated once calculation is executed
@@ -192,7 +209,8 @@ export function assessCalculationReadiness(input: {
     }
   }
 
-  if (!incomeSupportsBusinessExpenses(input.income) && input.deductions.entries.length > 0) {
+  const businessEntries = input.deductions.entries.filter((entry) => isBusinessDeductionCategory(entry.category));
+  if (!incomeSupportsBusinessExpenses(input.income) && businessEntries.length > 0) {
     errors.push("Business expenses were entered without freelance, gig, or business income.");
   }
 
@@ -324,6 +342,24 @@ export function buildTaxSituationSummary(input: {
         otherDependentsCount: 0,
       };
 
+  const rules = getTaxRules(input.taxYear as TaxYear);
+  const standardDeductionCents = rules.standardDeductions[effectiveFilingStatus] ?? 15_000_00;
+  const discoveredItemizedCents = input.deductions.saved ? itemizedDeductionTotalCents(input.deductions) : 0;
+  const deductionsSummary: TaxSituationSummary["deductionsSummary"] = {
+    standardDeductionCents,
+    businessExpensesCents: expenseCents,
+    discoveredItemizedCents,
+    deductionTypeUsed: "standard",
+    deductionUsedCents: calc?.deductionUsedCents ?? standardDeductionCents,
+    itemizedCategoriesCount: input.deductions.entries.filter(
+      (e) => e.confirmed && isItemizedDeductionCategory(e.category)
+    ).length,
+    unsupportedDeductionsNotice:
+      discoveredItemizedCents > 0
+        ? "Itemized deductions (Schedule A) were discovered, but the official IRS standard deduction was applied by the deterministic engine."
+        : undefined,
+  };
+
   const informationReceived = [
     ...(input.profile.fullName ? [`Profile for ${input.profile.fullName}`] : []),
     `Filing status: ${householdSummary.filingStatusLabel}`,
@@ -339,8 +375,13 @@ export function buildTaxSituationSummary(input: {
       : []),
     ...incomeSources,
     ...documentsReceived.map((name) => `${name} recorded as received`),
-    ...(input.deductions.saved && input.deductions.hasBusinessExpenses
+    ...(input.deductions.saved && expenseCents > 0
+      ? [`Business expenses entered: $${(expenseCents / 100).toLocaleString()}`]
+      : input.deductions.saved && input.deductions.hasBusinessExpenses
       ? ["Business expenses entered"]
+      : []),
+    ...(input.deductions.saved && discoveredItemizedCents > 0
+      ? [`Discovered deductions: $${(discoveredItemizedCents / 100).toLocaleString()} (Standard deduction applied)`]
       : []),
     ...(input.deductions.saved && input.deductions.standardDeductionAcknowledged
       ? ["Standard deduction will be used by the tax engine"]
@@ -357,6 +398,7 @@ export function buildTaxSituationSummary(input: {
     filingStatus: effectiveFilingStatus,
     householdSummary,
     creditsSummary,
+    deductionsSummary,
     whatYouToldUs: {
       incomeSources,
       w2WagesCents,
