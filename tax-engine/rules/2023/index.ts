@@ -70,4 +70,66 @@ export const RULES_2023: TaxYearRules = {
     socialSecurityWageCapCents: 16020000, // $160,200
     deductibleHalfFactor: 0.50,
   },
+  credits: {
+    childTaxCredit: {
+      maxCreditPerChildCents: 200000, // $2,000 per qualifying child
+      maxRefundableActcCents: 160000, // $1,600 refundable limit for 2023
+      phaseoutThresholdCents: {
+        single: 20000000, // $200,000
+        married_filing_jointly: 40000000, // $400,000
+        married_filing_separately: 20000000, // $200,000
+        head_of_household: 20000000, // $200,000
+        qualifying_surviving_spouse: 20000000, // $200,000
+      },
+      phaseoutStepCents: 100000, // $1,000
+      phaseoutReductionCents: 5000, // $50 per $1,000 or fraction thereof
+      actcEarnedIncomeThresholdCents: 250000, // $2,500
+      actcRate: 0.15, // 15% of earned income above $2,500
+      qualifyingChildMaxAge: 17, // Under 17 as of Dec 31
+    },
+    creditForOtherDependents: {
+      maxCreditPerDependentCents: 50000, // $500 per other qualifying dependent
+    },
+    earnedIncomeCredit: {
+      investmentIncomeLimitCents: 1100000, // $11,000
+      disallowedForMfs: true,
+      tiers: {
+        0: {
+          maxCreditCents: 60000, // $600
+          phaseInRate: 0.0765,
+          earnedIncomeForMaxCreditCents: 784000, // $7,840
+          phaseOutThresholdSingleCents: 980000, // $9,800
+          phaseOutThresholdMfjCents: 1637000, // $16,370
+          phaseOutRate: 0.0765,
+        },
+        1: {
+          maxCreditCents: 399500, // $3,995
+          phaseInRate: 0.34,
+          earnedIncomeForMaxCreditCents: 1175000, // $11,750
+          phaseOutThresholdSingleCents: 2156000, // $21,560
+          phaseOutThresholdMfjCents: 2812000, // $28,120
+          phaseOutRate: 0.1598,
+        },
+        2: {
+          maxCreditCents: 660400, // $6,604
+          phaseInRate: 0.40,
+          earnedIncomeForMaxCreditCents: 1651000, // $16,510
+          phaseOutThresholdSingleCents: 2156000, // $21,560
+          phaseOutThresholdMfjCents: 2812000, // $28,120
+          phaseOutRate: 0.2106,
+        },
+        3: {
+          maxCreditCents: 743000, // $7,430
+          phaseInRate: 0.45,
+          earnedIncomeForMaxCreditCents: 1651000, // $16,510
+          phaseOutThresholdSingleCents: 2156000, // $21,560
+          phaseOutThresholdMfjCents: 2812000, // $28,120
+          phaseOutRate: 0.2106,
+        },
+      },
+    },
+    get eitc() {
+      return this.earnedIncomeCredit;
+    },
+  },
 };

@@ -4,7 +4,8 @@ import { DocumentsSnapshot } from "@/lib/preparation/documents";
 import { DeductionDiscovery, deductionExpenseCents, incomeSupportsBusinessExpenses } from "@/lib/preparation/deductions";
 import { isCompleteDeductionDiscovery } from "@/lib/validations/preparation-deductions";
 import { PreparationProfileSnapshot, PreparationStep, PreparationStepMap, PREPARATION_STEPS } from "@/lib/preparation/steps";
-import { TaxCalculationResult, CalculatorType, TaxWarning } from "@/types/tax";
+import { TaxCalculationResult, CalculatorType, TaxWarning, TaxCreditsBreakdown, TaxYear } from "@/types/tax";
+import { HouseholdSnapshot, getHouseholdSummary, HouseholdSummary, FILING_STATUS_LABELS } from "@/lib/preparation/household";
 
 export interface CalculationReadiness {
   ready: boolean;
@@ -33,6 +34,9 @@ export interface TaxSituationSummaryCalculation {
   estimatedAmountOwedCents: number;
   effectiveTaxRate: number;
   marginalTaxBracket: number;
+  taxBeforeCreditsCents?: number;
+  credits?: TaxCreditsBreakdown;
+  totalCreditsCents?: number;
   refundOrBalanceDue: {
     type: "refund" | "balance_due" | "zero";
     amountCents: number;
@@ -63,6 +67,16 @@ export interface TaxSituationSummary {
   };
   calculationStatus: "ready" | "not_ready" | "calculated";
   readiness: CalculationReadiness;
+  householdSummary?: HouseholdSummary;
+  creditsSummary?: {
+    taxBeforeCreditsCents: number;
+    totalCreditsCents: number;
+    childTaxCreditCents: number;
+    creditForOtherDependentsCents: number;
+    additionalChildTaxCreditCents: number;
+    earnedIncomeCreditCents: number;
+    finalFederalTaxLiabilityCents: number;
+  };
 
   // Actual calculation results populated once calculation is executed
   calculationId?: string | null;
@@ -82,6 +96,7 @@ export interface TaxSituationSummary {
 
 export function assessCalculationReadiness(input: {
   profile: PreparationProfileSnapshot;
+  household?: HouseholdSnapshot;
   steps: PreparationStepMap;
   income: IncomeDiscovery;
   documents: DocumentsSnapshot;
@@ -99,6 +114,64 @@ export function assessCalculationReadiness(input: {
   }
   if (!isCompleteIncomeDiscovery(input.income)) {
     missing.push("Income sources");
+  }
+
+  // Household & Dependent Validation
+  if (input.household) {
+    const filingStatus = input.household.filingStatus || input.profile.filingStatus;
+    if (filingStatus === "married_filing_jointly" || filingStatus === "married_filing_separately") {
+      if (!input.household.spouse?.firstName || !input.household.spouse?.lastName) {
+        if (input.steps.taxpayer_profile === "completed") {
+          errors.push("Married filing status requires spouse first and last name.");
+        } else {
+          missing.push("Spouse information");
+        }
+      }
+    }
+    if (filingStatus === "head_of_household" && input.household.dependents.length === 0) {
+      if (input.steps.taxpayer_profile === "completed") {
+        errors.push("Head of Household requires at least one qualifying dependent.");
+      } else {
+        missing.push("Qualifying dependent for Head of Household");
+      }
+    }
+    if (filingStatus === "qualifying_surviving_spouse") {
+      const hasChild = input.household.dependents.some((d) =>
+        ["child", "son", "daughter", "stepchild", "foster_child"].includes(d.relationship)
+      );
+      if (!hasChild) {
+        if (input.steps.taxpayer_profile === "completed") {
+          errors.push("Qualifying Surviving Spouse status requires at least one qualifying dependent child.");
+        } else {
+          missing.push("Qualifying dependent child");
+        }
+      }
+    }
+
+    // Check individual dependent validity
+    for (const dep of input.household.dependents) {
+      if (!dep.firstName?.trim() || !dep.lastName?.trim()) {
+        errors.push("A dependent is missing their name.");
+      }
+      if (!dep.dateOfBirth?.trim()) {
+        errors.push("A dependent is missing a valid date of birth.");
+      } else {
+        const parsed = new Date(dep.dateOfBirth);
+        if (isNaN(parsed.getTime()) || parsed > new Date()) {
+          errors.push("Dependent date of birth cannot be in the future.");
+        }
+      }
+    }
+
+    // Duplicate dependent check
+    const seen = new Set<string>();
+    for (const dep of input.household.dependents) {
+      const key = `${dep.firstName.toLowerCase()}|${dep.lastName.toLowerCase()}|${dep.dateOfBirth}`;
+      if (seen.has(key)) {
+        errors.push(`Duplicate dependent detected (${dep.firstName} ${dep.lastName}).`);
+      }
+      seen.add(key);
+    }
   }
 
   const deductionCheck = isCompleteDeductionDiscovery(input.deductions, input.income);
@@ -139,6 +212,7 @@ export function buildTaxSituationSummary(input: {
   income: IncomeDiscovery;
   documents: DocumentsSnapshot;
   deductions: DeductionDiscovery;
+  household?: HouseholdSnapshot;
   calculationSnapshot?: TaxCalculationResult | null;
   calculationId?: string | null;
 }): TaxSituationSummary {
@@ -168,6 +242,8 @@ export function buildTaxSituationSummary(input: {
 
   const allWarnings = [...readiness.warnings];
 
+  let creditsSummary: TaxSituationSummary["creditsSummary"] = undefined;
+
   if (calc) {
     calculationStatus = "calculated";
     const isRefund = calc.estimatedRefundCents > 0;
@@ -191,6 +267,9 @@ export function buildTaxSituationSummary(input: {
       taxableIncomeCents: calc.taxableIncomeCents,
       deductionUsedCents: calc.deductionUsedCents,
       deductionType: calc.deductionType,
+      taxBeforeCreditsCents: calc.taxBeforeCreditsCents ?? calc.federalIncomeTaxCents,
+      credits: calc.credits,
+      totalCreditsCents: calc.totalCreditsCents,
       federalIncomeTaxCents: calc.federalIncomeTaxCents,
       selfEmploymentTaxCents: calc.selfEmploymentTaxCents,
       totalTaxLiabilityCents: calc.totalTaxLiabilityCents,
@@ -203,6 +282,27 @@ export function buildTaxSituationSummary(input: {
       warnings: calc.warnings,
     };
 
+    if (calc.credits || calc.totalCreditsCents) {
+      const cr = calc.credits || {
+        childTaxCreditCents: 0,
+        creditForOtherDependentsCents: 0,
+        additionalChildTaxCreditCents: 0,
+        earnedIncomeCreditCents: 0,
+        totalCreditsCents: calc.totalCreditsCents || 0,
+        qualifyingChildrenCount: 0,
+        otherDependentsCount: 0,
+      };
+      creditsSummary = {
+        taxBeforeCreditsCents: calc.taxBeforeCreditsCents ?? calc.federalIncomeTaxCents,
+        totalCreditsCents: calc.totalCreditsCents ?? cr.totalCreditsCents,
+        childTaxCreditCents: cr.childTaxCreditCents,
+        creditForOtherDependentsCents: cr.creditForOtherDependentsCents,
+        additionalChildTaxCreditCents: cr.additionalChildTaxCreditCents,
+        earnedIncomeCreditCents: cr.earnedIncomeCreditCents,
+        finalFederalTaxLiabilityCents: calc.totalTaxLiabilityCents ?? calc.federalIncomeTaxCents,
+      };
+    }
+
     for (const w of calc.warnings) {
       if (!allWarnings.includes(w.message)) {
         allWarnings.push(w.message);
@@ -210,8 +310,33 @@ export function buildTaxSituationSummary(input: {
     }
   }
 
+  const effectiveFilingStatus = input.household?.filingStatus || input.profile.filingStatus;
+  const householdSummary: HouseholdSummary = input.household
+    ? getHouseholdSummary(input.household, input.taxYear)
+    : {
+        filingStatus: effectiveFilingStatus,
+        filingStatusLabel: FILING_STATUS_LABELS[effectiveFilingStatus] || "Single",
+        hasSpouse: false,
+        spouseName: undefined,
+        totalDependents: 0,
+        dependentsCount: 0,
+        qualifyingChildrenCount: 0,
+        otherDependentsCount: 0,
+      };
+
   const informationReceived = [
     ...(input.profile.fullName ? [`Profile for ${input.profile.fullName}`] : []),
+    `Filing status: ${householdSummary.filingStatusLabel}`,
+    ...(householdSummary.hasSpouse && householdSummary.spouseName
+      ? [`Spouse: ${householdSummary.spouseName}`]
+      : []),
+    ...(householdSummary.dependentsCount > 0
+      ? [
+          `${householdSummary.dependentsCount} dependent${
+            householdSummary.dependentsCount === 1 ? "" : "s"
+          } (${householdSummary.qualifyingChildrenCount} qualifying children for CTC)`,
+        ]
+      : []),
     ...incomeSources,
     ...documentsReceived.map((name) => `${name} recorded as received`),
     ...(input.deductions.saved && input.deductions.hasBusinessExpenses
@@ -221,12 +346,17 @@ export function buildTaxSituationSummary(input: {
       ? ["Standard deduction will be used by the tax engine"]
       : []),
     ...(calc ? ["Deterministic federal tax calculation completed"] : []),
+    ...(calc?.totalCreditsCents && calc.totalCreditsCents > 0
+      ? [`Family credits applied: $${(calc.totalCreditsCents / 100).toLocaleString()}`]
+      : []),
   ];
 
   return {
     taxYear: input.taxYear,
     taxpayerName: input.profile.fullName,
-    filingStatus: input.profile.filingStatus,
+    filingStatus: effectiveFilingStatus,
+    householdSummary,
+    creditsSummary,
     whatYouToldUs: {
       incomeSources,
       w2WagesCents,

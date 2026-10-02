@@ -28,6 +28,7 @@ import { ProfessionalLeadRecord } from "@/lib/services/professional-lead-store";
 const CONTEXTUAL_AI_QUESTIONS = [
   { label: "Explain my tax result", query: "Explain my tax result." },
   { label: "Why do I owe/refund this amount?", query: "Why do I owe/refund this amount?" },
+  { label: "Explain my family credits", query: "Explain my family credits and how they were calculated." },
   { label: "What information am I missing?", query: "What information am I missing?" },
   { label: "Explain my deductions", query: "Explain my deductions." },
   { label: "What should I review before submitting?", query: "What should I review before submitting?" },
@@ -70,6 +71,8 @@ export function TaxSituationSummaryPanel({
     checkLead();
   }, [session?.id]);
 
+  const household = summary.householdSummary;
+
   return (
     <section className="space-y-6" aria-labelledby="situation-heading">
       {/* Overview & Metadata Card */}
@@ -82,7 +85,7 @@ export function TaxSituationSummaryPanel({
             <p className="text-xs text-surface-500 mt-0.5">
               Tax Year {summary.taxYear} · Filing Status:{" "}
               <span className="font-semibold text-surface-700 capitalize">
-                {summary.filingStatus.replaceAll("_", " ")}
+                {household?.filingStatusLabel || summary.filingStatus.replaceAll("_", " ")}
               </span>
               {summary.taxpayerName ? ` · Taxpayer: ${summary.taxpayerName}` : ""}
             </p>
@@ -101,29 +104,46 @@ export function TaxSituationSummaryPanel({
           </div>
         </CardHeader>
         <CardContent className="pt-4 space-y-4 text-sm">
-          {/* Income & Expenses entered */}
+          {/* Income, Household & Expenses entered */}
           <div>
             <p className="font-semibold text-surface-900 mb-1.5">What you told us</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-surface-700">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-surface-700">
+              {/* Household Block */}
+              <div className="p-2.5 rounded-lg bg-surface-50 border border-surface-200 space-y-1">
+                <p className="text-xs text-surface-500 uppercase tracking-wider font-semibold">Household</p>
+                <p className="text-sm font-medium text-surface-900">
+                  Status: {household?.filingStatusLabel || summary.filingStatus.replaceAll("_", " ")}
+                </p>
+                <p className="text-xs text-surface-700">
+                  Spouse: {household?.hasSpouse ? household.spouseName || "Included" : "None"}
+                </p>
+                <p className="text-xs text-surface-700">
+                  Dependents: {household ? `${household.dependentsCount} (${household.qualifyingChildrenCount} for CTC)` : "0"}
+                </p>
+              </div>
+
+              {/* Reported Income Block */}
               <div className="p-2.5 rounded-lg bg-surface-50 border border-surface-200 space-y-1">
                 <p className="text-xs text-surface-500 uppercase tracking-wider font-semibold">Reported Income</p>
                 <p className="text-sm font-medium text-surface-900">
-                  W-2 Wages: {formatCurrencyFromCents(summary.whatYouToldUs.w2WagesCents)}
+                  W-2: {formatCurrencyFromCents(summary.whatYouToldUs.w2WagesCents)}
                 </p>
-                <p className="text-sm font-medium text-surface-900">
-                  1099 Gross: {formatCurrencyFromCents(summary.whatYouToldUs.form1099GrossCents)}
+                <p className="text-xs text-surface-700">
+                  1099: {formatCurrencyFromCents(summary.whatYouToldUs.form1099GrossCents)}
                 </p>
-                <p className="text-sm font-medium text-surface-900">
-                  Gig & Business: {formatCurrencyFromCents(summary.whatYouToldUs.gigBusinessGrossCents)}
+                <p className="text-xs text-surface-700">
+                  Gig/Biz: {formatCurrencyFromCents(summary.whatYouToldUs.gigBusinessGrossCents)}
                 </p>
               </div>
+
+              {/* Deductions & Expenses Block */}
               <div className="p-2.5 rounded-lg bg-surface-50 border border-surface-200 space-y-1">
                 <p className="text-xs text-surface-500 uppercase tracking-wider font-semibold">Deductions & Expenses</p>
                 <p className="text-sm font-medium text-surface-900">
-                  Business Expenses: {formatCurrencyFromCents(summary.whatYouToldUs.expenseCents)}
+                  Expenses: {formatCurrencyFromCents(summary.whatYouToldUs.expenseCents)}
                 </p>
                 <p className="text-xs text-surface-600 mt-1">
-                  Standard deduction will be applied automatically by the deterministic tax engine.
+                  Standard deduction applied automatically by engine.
                 </p>
               </div>
             </div>
@@ -289,11 +309,78 @@ export function TaxSituationSummaryPanel({
                 </div>
               </div>
 
+              {/* Family & Tax Credits Breakdown */}
+              {calc.credits && (calc.credits.totalCreditsCents > 0 || (calc.totalCreditsCents && calc.totalCreditsCents > 0)) && (
+                <div className="p-3.5 rounded-lg bg-emerald-50/60 border border-emerald-200 text-xs text-surface-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-emerald-950 uppercase tracking-wider text-[11px]">
+                      Family & Tax Credits (Official IRS Rules)
+                    </span>
+                    <span className="font-bold text-emerald-900 text-sm">
+                      -{formatCurrencyFromCents(calc.totalCreditsCents || calc.credits.totalCreditsCents)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-emerald-200/60">
+                    <div>
+                      <p className="text-surface-600">Tax Before Credits:</p>
+                      <p className="font-semibold text-surface-900">
+                        {formatCurrencyFromCents(calc.taxBeforeCreditsCents ?? calc.federalIncomeTaxCents)}
+                      </p>
+                    </div>
+                    {calc.credits.childTaxCreditCents > 0 && (
+                      <div>
+                        <p className="text-surface-600">Child Tax Credit (CTC):</p>
+                        <p className="font-semibold text-emerald-800">
+                          {formatCurrencyFromCents(calc.credits.childTaxCreditCents)} ({calc.credits.qualifyingChildrenCount} qualifying child/children)
+                        </p>
+                      </div>
+                    )}
+                    {calc.credits.creditForOtherDependentsCents > 0 && (
+                      <div>
+                        <p className="text-surface-600">Credit for Other Dependents (ODC):</p>
+                        <p className="font-semibold text-emerald-800">
+                          {formatCurrencyFromCents(calc.credits.creditForOtherDependentsCents)} ({calc.credits.otherDependentsCount} dependent(s))
+                        </p>
+                      </div>
+                    )}
+                    {calc.credits.additionalChildTaxCreditCents > 0 && (
+                      <div>
+                        <p className="text-surface-600">Additional Child Tax Credit (Refundable ACTC):</p>
+                        <p className="font-semibold text-emerald-800">
+                          {formatCurrencyFromCents(calc.credits.additionalChildTaxCreditCents)}
+                        </p>
+                      </div>
+                    )}
+                    {calc.credits.earnedIncomeCreditCents > 0 && (
+                      <div>
+                        <p className="text-surface-600">Earned Income Tax Credit (Refundable EITC):</p>
+                        <p className="font-semibold text-emerald-800">
+                          {formatCurrencyFromCents(calc.credits.earnedIncomeCreditCents)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="pt-1.5 border-t border-emerald-200/60 flex flex-wrap justify-between items-center text-emerald-950 font-medium">
+                    <span>Final Federal Tax Liability (after non-refundable credits):</span>
+                    <span className="font-bold text-surface-900">
+                      {formatCurrencyFromCents(calc.totalTaxLiabilityCents)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Tax Liability Components */}
               <div className="p-3 rounded-lg bg-surface-50 border border-surface-200 text-xs text-surface-700 flex flex-col sm:flex-row justify-between gap-2">
                 <div>
                   <span className="font-semibold text-surface-900">Tax Liability Breakdown: </span>
-                  <span>Federal Income Tax: {formatCurrencyFromCents(calc.federalIncomeTaxCents)}</span>
+                  <span>
+                    Tax Before Credits: {formatCurrencyFromCents(calc.taxBeforeCreditsCents ?? calc.federalIncomeTaxCents)}
+                  </span>
+                  {calc.totalCreditsCents && calc.totalCreditsCents > 0 && (
+                    <span className="ml-2 font-medium text-emerald-700">
+                      - Family Credits: {formatCurrencyFromCents(calc.totalCreditsCents)}
+                    </span>
+                  )}
                   {calc.selfEmploymentTaxCents > 0 && (
                     <span className="ml-2 font-medium text-purple-700">
                       + Self-Employment Tax: {formatCurrencyFromCents(calc.selfEmploymentTaxCents)}
@@ -301,7 +388,7 @@ export function TaxSituationSummaryPanel({
                   )}
                 </div>
                 <div className="font-bold text-surface-900">
-                  Total Tax Liability: {formatCurrencyFromCents(calc.totalTaxLiabilityCents)}
+                  Final Federal Tax Liability: {formatCurrencyFromCents(calc.totalTaxLiabilityCents)}
                 </div>
               </div>
 
@@ -371,6 +458,12 @@ export function TaxSituationSummaryPanel({
                     Schedule SE self-employment tax was calculated on your 1099 and gig earnings, with a 50% above-the-line deduction applied to AGI.
                   </li>
                 )}
+                {calc.totalCreditsCents && calc.totalCreditsCents > 0 ? (
+                  <li>
+                    You received <strong>{formatCurrencyFromCents(calc.totalCreditsCents)}</strong> in family tax credits
+                    {calc.credits?.childTaxCreditCents ? " (including the Child Tax Credit)" : ""}, directly lowering your federal tax liability dollar-for-dollar.
+                  </li>
+                ) : null}
                 <li>
                   Your federal withholding of{" "}
                   <strong>{formatCurrencyFromCents(calc.totalPaymentsAndWithholdingCents)}</strong> was credited dollar-for-dollar against your total federal tax liability.

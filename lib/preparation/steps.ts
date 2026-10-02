@@ -37,7 +37,7 @@ export interface PreparationProfileSnapshot {
 }
 
 export const PREPARATION_STEP_LABELS: Record<PreparationStep, string> = {
-  taxpayer_profile: "Taxpayer profile",
+  taxpayer_profile: "Taxpayer profile & household",
   income: "Income",
   documents: "Documents",
   deductions: "Deductions",

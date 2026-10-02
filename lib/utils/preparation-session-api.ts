@@ -4,6 +4,8 @@ import { IncomeDiscovery } from "@/lib/preparation/income";
 import { DocumentsInput } from "@/lib/validations/preparation-documents";
 import { DeductionDiscovery } from "@/lib/preparation/deductions";
 import { PreparationStep } from "@/lib/preparation/steps";
+import { HouseholdInput } from "@/lib/validations/preparation-household";
+import { HouseholdSnapshot } from "@/lib/preparation/household";
 
 export interface PreparationSessionApiResponse {
   success: boolean;
@@ -19,6 +21,15 @@ export async function startPreparationSession(): Promise<PreparationSessionApiRe
   return requestPreparationSession("/api/v1/tax/preparation/session", {
     method: "POST",
     body: JSON.stringify({}),
+  });
+}
+
+export async function savePreparationHousehold(
+  household: HouseholdInput | HouseholdSnapshot
+): Promise<PreparationSessionApiResponse> {
+  return requestPreparationSession("/api/v1/tax/preparation/session/household", {
+    method: "PUT",
+    body: JSON.stringify(household),
   });
 }
 

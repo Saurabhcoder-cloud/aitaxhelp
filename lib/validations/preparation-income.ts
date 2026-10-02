@@ -20,7 +20,7 @@ const nameSchema = z
   .min(1, "A name is required.")
   .max(120, "Name cannot exceed 120 characters.");
 
-const idSchema = z.string().uuid("Each income record needs a valid id.");
+const idSchema = z.string().trim().min(1, "Each income record needs a valid id.");
 
 const w2Schema = z
   .object({

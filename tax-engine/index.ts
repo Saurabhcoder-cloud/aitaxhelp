@@ -11,6 +11,7 @@ import { resolveDeductions } from "./calculations/deductions";
 import { calculateProgressiveTax } from "./calculations/income-tax";
 import { calculateSelfEmploymentTax } from "./calculations/self-employment";
 import { calculateQuarterlySchedule } from "./calculations/quarterly";
+import { calculateCredits } from "./calculations/credits";
 
 export const ENGINE_VERSION = "1.1.0-production-baseline";
 
@@ -45,7 +46,9 @@ export function calculateIncomeTax(
   const rules = getTaxRules(input.taxYear);
   const warnings = getStandardWarnings();
 
-  const grossIncomeCents = (input.w2WagesCents ?? input.w2IncomeCents ?? 0) + (input.otherIncomeCents ?? 0);
+  const spouseW2Cents = input.spouse?.spouseW2WagesCents ?? input.spouse?.w2WagesCents ?? 0;
+  const primaryW2Cents = (input.w2WagesCents ?? input.w2IncomeCents ?? 0);
+  const grossIncomeCents = primaryW2Cents + spouseW2Cents + (input.otherIncomeCents ?? 0);
   const withholdingCents = input.federalWithholdingCents ?? input.withholdingCents ?? 0;
 
   // Deductions: Standard deduction in current baseline
@@ -69,10 +72,25 @@ export function calculateIncomeTax(
     brackets
   );
 
-  const totalTaxLiabilityCents = federalIncomeTaxCents;
+  const taxBeforeCreditsCents = federalIncomeTaxCents;
 
-  const estimatedRefundCents = Math.max(0, withholdingCents - totalTaxLiabilityCents);
-  const estimatedAmountOwedCents = Math.max(0, totalTaxLiabilityCents - withholdingCents);
+  // Deterministic Credits Computation (CTC, ODC, ACTC, EITC)
+  const earnedIncomeCents = grossIncomeCents;
+  const creditsOutput = calculateCredits(
+    input.taxYear,
+    input.filingStatus,
+    adjustedGrossIncomeCents,
+    earnedIncomeCents,
+    taxBeforeCreditsCents,
+    input.dependents ?? [],
+    { investmentIncomeCents: input.investmentIncomeCents }
+  );
+
+  const totalTaxLiabilityCents = creditsOutput.taxAfterNonRefundableCreditsCents;
+
+  const totalPaymentsAndCreditsCents = withholdingCents + creditsOutput.totalRefundableCreditsCents;
+  const estimatedRefundCents = Math.max(0, totalPaymentsAndCreditsCents - totalTaxLiabilityCents);
+  const estimatedAmountOwedCents = Math.max(0, totalTaxLiabilityCents - totalPaymentsAndCreditsCents);
 
   const effectiveTaxRate =
     grossIncomeCents > 0
@@ -97,6 +115,11 @@ export function calculateIncomeTax(
     federalIncomeTaxCents,
     selfEmploymentTaxCents: 0,
     totalTaxLiabilityCents,
+
+    // Family Tax Credits Extension
+    taxBeforeCreditsCents,
+    credits: creditsOutput,
+    totalCreditsCents: creditsOutput.totalCreditsCents,
 
     totalPaymentsAndWithholdingCents: withholdingCents,
     estimatedRefundCents,
@@ -131,13 +154,50 @@ export function calculateSelfEmployedTax(
   const w2WagesCents = input.w2WagesCents ?? 0;
   const withholdingCents = input.federalWithholdingCents ?? 0;
 
-  // 1. Calculate Self-Employment Tax (Schedule SE)
+  const spouseW2WagesCents =
+    input.spouseW2WagesCents ??
+    input.spouse?.spouseW2WagesCents ??
+    input.spouse?.w2WagesCents ??
+    0;
+  const spouse1099GrossCents =
+    input.spouseGross1099IncomeCents ??
+    input.spouse?.spouseGross1099IncomeCents ??
+    input.spouse?.spouse1099GrossCents ??
+    input.spouse?.gross1099IncomeCents ??
+    0;
+  const spouseExpensesCents =
+    input.spouseBusinessExpensesCents ??
+    input.spouse?.spouseBusinessExpensesCents ??
+    input.spouse?.businessExpensesCents ??
+    0;
+
+  // 1. Calculate Self-Employment Tax (Schedule SE) for Primary Taxpayer
   const seOutput = calculateSelfEmploymentTax(
     input.taxYear,
     input.gross1099IncomeCents,
     input.businessExpensesCents,
     w2WagesCents
   );
+
+  // Calculate Spouse Self-Employment Tax independently if spouse has 1099 receipts
+  let spouseSeTaxCents = 0;
+  let spouseDeductibleHalfCents = 0;
+  let spouseNetProfitCents = 0;
+
+  if (spouse1099GrossCents > 0) {
+    const spouseSeOutput = calculateSelfEmploymentTax(
+      input.taxYear,
+      spouse1099GrossCents,
+      spouseExpensesCents,
+      spouseW2WagesCents
+    );
+    spouseSeTaxCents = spouseSeOutput.totalSelfEmploymentTaxCents;
+    spouseDeductibleHalfCents = spouseSeOutput.deductibleHalfCents;
+    spouseNetProfitCents = spouseSeOutput.netSelfEmploymentProfitCents;
+  }
+
+  const totalSelfEmploymentTaxCents = seOutput.totalSelfEmploymentTaxCents + spouseSeTaxCents;
+  const totalDeductibleHalfCents = seOutput.deductibleHalfCents + spouseDeductibleHalfCents;
 
   if (input.businessExpensesCents > input.gross1099IncomeCents) {
     warnings.push({
@@ -148,10 +208,11 @@ export function calculateSelfEmployedTax(
   }
 
   // 2. Gross & Adjusted Gross Income
-  const grossIncomeCents = w2WagesCents + seOutput.netSelfEmploymentProfitCents;
+  const grossIncomeCents =
+    w2WagesCents + spouseW2WagesCents + seOutput.netSelfEmploymentProfitCents + spouseNetProfitCents;
 
   // Above-the-line deduction: 50% of self-employment tax reduces AGI
-  const adjustedGrossIncomeCents = Math.max(0, grossIncomeCents - seOutput.deductibleHalfCents);
+  const adjustedGrossIncomeCents = Math.max(0, grossIncomeCents - totalDeductibleHalfCents);
 
   // 3. Deductions (Standard Deduction for filing status)
   const deduction = resolveDeductions(input.taxYear, input.filingStatus, 0);
@@ -164,11 +225,28 @@ export function calculateSelfEmployedTax(
     brackets
   );
 
-  // 5. Total Tax Liability = Federal Income Tax + Self Employment Tax
-  const totalTaxLiabilityCents = federalIncomeTaxCents + seOutput.totalSelfEmploymentTaxCents;
+  const taxBeforeCreditsCents = federalIncomeTaxCents;
 
-  const estimatedRefundCents = Math.max(0, withholdingCents - totalTaxLiabilityCents);
-  const estimatedAmountOwedCents = Math.max(0, totalTaxLiabilityCents - withholdingCents);
+  // 5. Deterministic Credits Computation (CTC, ODC, ACTC, EITC)
+  const earnedIncomeCents =
+    w2WagesCents + spouseW2WagesCents + seOutput.netSelfEmploymentProfitCents + spouseNetProfitCents;
+  const creditsOutput = calculateCredits(
+    input.taxYear,
+    input.filingStatus,
+    adjustedGrossIncomeCents,
+    earnedIncomeCents,
+    taxBeforeCreditsCents,
+    input.dependents ?? [],
+    { investmentIncomeCents: input.investmentIncomeCents }
+  );
+
+  // Total Tax Liability = Federal Income Tax after non-refundable credits + Self Employment Tax
+  const totalTaxLiabilityCents =
+    creditsOutput.taxAfterNonRefundableCreditsCents + totalSelfEmploymentTaxCents;
+
+  const totalPaymentsAndCreditsCents = withholdingCents + creditsOutput.totalRefundableCreditsCents;
+  const estimatedRefundCents = Math.max(0, totalPaymentsAndCreditsCents - totalTaxLiabilityCents);
+  const estimatedAmountOwedCents = Math.max(0, totalTaxLiabilityCents - totalPaymentsAndCreditsCents);
 
   const effectiveTaxRate =
     grossIncomeCents > 0
@@ -191,8 +269,13 @@ export function calculateSelfEmployedTax(
     taxableIncomeCents,
 
     federalIncomeTaxCents,
-    selfEmploymentTaxCents: seOutput.totalSelfEmploymentTaxCents,
+    selfEmploymentTaxCents: totalSelfEmploymentTaxCents,
     totalTaxLiabilityCents,
+
+    // Family Tax Credits Extension
+    taxBeforeCreditsCents,
+    credits: creditsOutput,
+    totalCreditsCents: creditsOutput.totalCreditsCents,
 
     totalPaymentsAndWithholdingCents: withholdingCents,
     estimatedRefundCents,

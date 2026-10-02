@@ -35,3 +35,4 @@ export function isSupportedTaxYear(year: number): year is TaxYear {
 }
 
 export { RULES_2026, RULES_2025, RULES_2024, RULES_2023 };
+export const getTaxYearRules = getTaxRules;

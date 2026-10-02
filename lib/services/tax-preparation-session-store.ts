@@ -16,6 +16,8 @@ import { DeductionDiscovery, emptyDeductionDiscovery } from "@/lib/preparation/d
 import { documentsInputSchema, DocumentsInput } from "@/lib/validations/preparation-documents";
 import { deductionDiscoveryInputSchema } from "@/lib/validations/preparation-deductions";
 import { isCompleteDeductionDiscovery } from "@/lib/validations/preparation-deductions";
+import { HouseholdSnapshot, emptyHouseholdSnapshot } from "@/lib/preparation/household";
+import { householdInputSchema, HouseholdInput } from "@/lib/validations/preparation-household";
 import {
   assessCalculationReadiness,
   buildTaxSituationSummary,
@@ -43,6 +45,7 @@ export interface TaxPreparationSession {
   currentStep: PreparationStep;
   steps: PreparationStepMap;
   profileSnapshot: PreparationProfileSnapshot;
+  householdSnapshot: HouseholdSnapshot;
   incomeSnapshot: IncomeDiscovery;
   documentsSnapshot: DocumentsSnapshot;
   deductionsSnapshot: DeductionDiscovery;
@@ -65,6 +68,7 @@ interface PreparationSessionRow {
   current_step: PreparationStep;
   steps: PreparationStepMap;
   profile_snapshot: PreparationProfileSnapshot;
+  household_snapshot?: HouseholdSnapshot | null;
   income_snapshot?: IncomeDiscovery | null;
   documents_snapshot?: DocumentsSnapshot | null;
   deductions_snapshot?: DeductionDiscovery | null;
@@ -128,7 +132,20 @@ function readDeductions(value: unknown): DeductionDiscovery {
   };
 }
 
+function readHousehold(value: unknown, defaultFilingStatus?: string): HouseholdSnapshot {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return emptyHouseholdSnapshot(defaultFilingStatus as any);
+  }
+  const record = value as Partial<HouseholdSnapshot>;
+  return {
+    filingStatus: record.filingStatus || (defaultFilingStatus as any) || "single",
+    spouse: record.spouse,
+    dependents: Array.isArray(record.dependents) ? record.dependents : [],
+  };
+}
+
 function toPublic(record: TaxPreparationSession): TaxPreparationSession {
+  const householdSnapshot = readHousehold(record.householdSnapshot, record.profileSnapshot?.filingStatus);
   const incomeSnapshot = readIncome(record.incomeSnapshot);
   const documentsSnapshot = readDocuments(record.documentsSnapshot);
   const deductionsSnapshot = readDeductions(record.deductionsSnapshot);
@@ -137,6 +154,7 @@ function toPublic(record: TaxPreparationSession): TaxPreparationSession {
     profile: record.profileSnapshot,
     steps: record.steps,
     currentStep: record.currentStep,
+    household: householdSnapshot,
     income: incomeSnapshot,
     documents: documentsSnapshot,
     deductions: deductionsSnapshot,
@@ -153,6 +171,7 @@ function toPublic(record: TaxPreparationSession): TaxPreparationSession {
 
   return {
     ...record,
+    householdSnapshot,
     incomeSnapshot,
     documentsSnapshot,
     deductionsSnapshot,
@@ -186,6 +205,7 @@ function fromRow(row: PreparationSessionRow): TaxPreparationSession {
     currentStep: row.current_step,
     steps: row.steps,
     profileSnapshot: row.profile_snapshot,
+    householdSnapshot: readHousehold(row.household_snapshot, row.profile_snapshot?.filingStatus),
     incomeSnapshot: readIncome(row.income_snapshot),
     documentsSnapshot: readDocuments(row.documents_snapshot),
     deductionsSnapshot: readDeductions(row.deductions_snapshot),
@@ -266,6 +286,7 @@ export class TaxPreparationSessionStore {
       currentStep,
       steps,
       profileSnapshot: snapshot,
+      householdSnapshot: emptyHouseholdSnapshot(taxProfile.filingStatus),
       incomeSnapshot: emptyIncomeDiscovery(),
       documentsSnapshot: emptyDocumentsSnapshot(),
       deductionsSnapshot: emptyDeductionDiscovery(),
@@ -384,6 +405,34 @@ export class TaxPreparationSessionStore {
     const updated: TaxPreparationSession = {
       ...current,
       currentStep: targetStep,
+      updatedAt: new Date().toISOString(),
+    };
+
+    return this.persist(updated);
+  }
+
+  /**
+   * Saves household (filing status, spouse, dependents) answers on the open session.
+   * Also keeps profileSnapshot.filingStatus in sync with the selected filing status.
+   * SECURITY: userId is the verified server user.
+   */
+  public static async saveHousehold(
+    userId: string,
+    household: HouseholdInput
+  ): Promise<TaxPreparationSession> {
+    const parsed = householdInputSchema.parse(household);
+    const current = await this.getCurrent(userId);
+    if (!current) {
+      throw new AppError("No open tax preparation session.", 404, "NOT_FOUND");
+    }
+
+    const updated: TaxPreparationSession = {
+      ...current,
+      householdSnapshot: parsed,
+      profileSnapshot: {
+        ...current.profileSnapshot,
+        filingStatus: parsed.filingStatus,
+      },
       updatedAt: new Date().toISOString(),
     };
 
@@ -521,6 +570,7 @@ export class TaxPreparationSessionStore {
     const readiness = assessCalculationReadiness({
       profile: current.profileSnapshot,
       steps: current.steps,
+      household: current.householdSnapshot,
       income: current.incomeSnapshot,
       documents: current.documentsSnapshot,
       deductions: current.deductionsSnapshot,
@@ -539,6 +589,7 @@ export class TaxPreparationSessionStore {
       taxYear: current.taxYear,
       profileSnapshot: current.profileSnapshot,
       steps: current.steps,
+      householdSnapshot: current.householdSnapshot,
       incomeSnapshot: current.incomeSnapshot,
       documentsSnapshot: current.documentsSnapshot,
       deductionsSnapshot: current.deductionsSnapshot,
@@ -660,6 +711,7 @@ export class TaxPreparationSessionStore {
         current_step: record.currentStep,
         steps: record.steps,
         profile_snapshot: record.profileSnapshot,
+        household_snapshot: record.householdSnapshot,
         income_snapshot: record.incomeSnapshot,
         documents_snapshot: record.documentsSnapshot,
         deductions_snapshot: record.deductionsSnapshot,
@@ -699,6 +751,7 @@ export class TaxPreparationSessionStore {
         current_step: record.currentStep,
         steps: record.steps,
         profile_snapshot: record.profileSnapshot,
+        household_snapshot: record.householdSnapshot,
         income_snapshot: record.incomeSnapshot,
         documents_snapshot: record.documentsSnapshot,
         deductions_snapshot: record.deductionsSnapshot,

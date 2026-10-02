@@ -37,6 +37,53 @@ export interface TaxWarning {
   message: string;
 }
 
+export interface DependentInput {
+  id?: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string; // YYYY-MM-DD
+  relationship: string;
+  monthsLivedWithTaxpayer?: number;
+  isFullTimeStudent?: boolean;
+  isPermanentlyDisabled?: boolean;
+  providedMoreThanHalfOwnSupport?: boolean;
+  providedMoreThanHalfSupport?: boolean;
+  claimedByOtherTaxpayer?: boolean;
+  isQualifyingChild?: boolean;
+  ssnLast4?: string;
+}
+
+export interface SpouseInput {
+  firstName: string;
+  lastName: string;
+  dateOfBirth?: string;
+  ssnLast4?: string;
+  hasIncome?: boolean;
+  hasW2Income?: boolean;
+  w2WagesCents?: number;
+  spouseW2WagesCents?: number;
+  federalWithholdingCents?: number;
+  hasSelfEmploymentIncome?: boolean;
+  gross1099IncomeCents?: number;
+  spouse1099GrossCents?: number;
+  spouseGross1099IncomeCents?: number;
+  businessExpensesCents?: number;
+  spouseBusinessExpensesCents?: number;
+}
+
+export interface TaxCreditsBreakdown {
+  childTaxCreditCents: number; // Non-refundable CTC
+  creditForOtherDependentsCents: number; // Non-refundable ODC
+  totalNonRefundableCreditsCents: number;
+  taxAfterNonRefundableCreditsCents: number;
+  additionalChildTaxCreditCents: number; // Refundable ACTC
+  earnedIncomeCreditCents: number; // Refundable EITC
+  totalRefundableCreditsCents: number;
+  totalCreditsCents: number;
+  qualifyingChildrenCount: number;
+  otherDependentsCount: number;
+}
+
 // Income Tax Calculator Input (Standard W-2 & Federal)
 export interface IncomeTaxCalculationInput {
   taxYear: TaxYear;
@@ -47,6 +94,9 @@ export interface IncomeTaxCalculationInput {
   federalWithholdingCents?: number;
   withholdingCents?: number;
   itemizedDeductionCents?: number;
+  dependents?: DependentInput[];
+  spouse?: SpouseInput;
+  investmentIncomeCents?: number;
 }
 
 // Self-Employed / 1099 Tax Calculation Input
@@ -58,6 +108,12 @@ export interface SelfEmployedCalculationInput {
   w2WagesCents?: number;
   federalWithholdingCents?: number;
   hasOtherSelfEmploymentIncome?: boolean;
+  dependents?: DependentInput[];
+  spouse?: SpouseInput;
+  investmentIncomeCents?: number;
+  spouseW2WagesCents?: number;
+  spouseGross1099IncomeCents?: number;
+  spouseBusinessExpensesCents?: number;
 }
 
 // Quarterly Estimated Tax Calculation Input
@@ -92,6 +148,11 @@ export interface TaxCalculationResult {
   federalIncomeTaxCents: number;
   selfEmploymentTaxCents: number;
   totalTaxLiabilityCents: number;
+
+  // Credits & Phase 1 Family Extension
+  taxBeforeCreditsCents?: number;
+  credits?: TaxCreditsBreakdown;
+  totalCreditsCents?: number;
 
   // Withholding & Net Position
   totalPaymentsAndWithholdingCents: number;

@@ -4,7 +4,10 @@ import {
   IncomeTaxCalculationInput,
   SelfEmployedCalculationInput,
   TaxYear,
+  DependentInput,
+  SpouseInput,
 } from "@/types/tax";
+import { HouseholdSnapshot } from "@/lib/preparation/household";
 import {
   calculateIncomeTax,
   calculateSelfEmployedTax,
@@ -43,6 +46,7 @@ export interface PreparationCalculationSessionData {
   taxYear: TaxYear;
   profileSnapshot: PreparationProfileSnapshot;
   steps: PreparationStepMap;
+  householdSnapshot?: HouseholdSnapshot;
   incomeSnapshot: IncomeDiscovery;
   documentsSnapshot: DocumentsSnapshot;
   deductionsSnapshot: DeductionDiscovery;
@@ -115,6 +119,7 @@ export function validatePreparationSessionForCalculation(
   return assessCalculationReadiness({
     profile: session.profileSnapshot,
     steps: session.steps,
+    household: session.householdSnapshot,
     income: session.incomeSnapshot,
     documents: session.documentsSnapshot,
     deductions: session.deductionsSnapshot,
@@ -129,6 +134,7 @@ export function validatePreparationSessionForCalculation(
  * - W-2 only -> income_tax calculator
  * - 1099 / self-employed / gig / business expenses -> self_employed calculator
  * - Combined W-2 wages + 1099 income + withholdings correctly aggregated.
+ * - Family / Household / Dependents mapped for CTC, ACTC, ODC, and EITC calculation.
  */
 export function mapPreparationSessionToEngineInput(
   session: PreparationCalculationSessionData
@@ -143,6 +149,8 @@ export function mapPreparationSessionToEngineInput(
     );
   }
 
+  const effectiveFilingStatus =
+    session.householdSnapshot?.filingStatus || session.profileSnapshot.filingStatus;
   const w2WagesCents = resolvePreparationW2WagesCents(session.incomeSnapshot);
   const withholding = resolvePreparationWithholdingCents(session.incomeSnapshot);
   const gross1099IncomeCents = resolvePreparationGross1099Cents(session.incomeSnapshot);
@@ -151,24 +159,64 @@ export function mapPreparationSessionToEngineInput(
     session.incomeSnapshot
   );
 
+  const dependents: DependentInput[] = (session.householdSnapshot?.dependents || []).map((dep) => ({
+    id: dep.id,
+    firstName: dep.firstName,
+    lastName: dep.lastName,
+    dateOfBirth: dep.dateOfBirth,
+    relationship: dep.relationship,
+    isQualifyingChild: dep.isQualifyingChild,
+    monthsLivedWithTaxpayer: dep.monthsLivedWithTaxpayer,
+    isFullTimeStudent: dep.isFullTimeStudent,
+    isPermanentlyDisabled: dep.isPermanentlyDisabled,
+    providedMoreThanHalfSupport: dep.providedMoreThanHalfSupport,
+  }));
+
+  const spouse: SpouseInput | undefined = session.householdSnapshot?.spouse
+    ? {
+        firstName: session.householdSnapshot.spouse.firstName,
+        lastName: session.householdSnapshot.spouse.lastName,
+        dateOfBirth: session.householdSnapshot.spouse.dateOfBirth,
+        hasW2Income: session.householdSnapshot.spouse.hasW2Income,
+        w2WagesCents: session.householdSnapshot.spouse.w2WagesCents,
+        hasSelfEmploymentIncome: session.householdSnapshot.spouse.hasSelfEmploymentIncome,
+        gross1099IncomeCents: session.householdSnapshot.spouse.gross1099IncomeCents,
+        businessExpensesCents: session.householdSnapshot.spouse.businessExpensesCents,
+        federalWithholdingCents: session.householdSnapshot.spouse.federalWithholdingCents,
+      }
+    : undefined;
+
+  const spouseWithholding = spouse?.federalWithholdingCents || 0;
+  const totalWithholdingCents = withholding.totalWithholdingCents + spouseWithholding;
+  const totalW2WithholdingCents = withholding.w2WithholdingCents + spouseWithholding;
+
+  const spouseHasSelfEmployment = Boolean(
+    spouse?.hasSelfEmploymentIncome &&
+      ((spouse?.gross1099IncomeCents && spouse.gross1099IncomeCents > 0) ||
+        (spouse?.businessExpensesCents && spouse.businessExpensesCents > 0))
+  );
+
   const hasSelfEmployedOr1099 =
     gross1099IncomeCents > 0 ||
     businessExpensesCents > 0 ||
     session.incomeSnapshot.form1099s.length > 0 ||
     session.incomeSnapshot.activities.length > 0 ||
-    session.incomeSnapshot.situations.some((situation) => situation !== "employer");
+    session.incomeSnapshot.situations.some((situation) => situation !== "employer") ||
+    spouseHasSelfEmployment;
 
   if (hasSelfEmployedOr1099) {
     const input: SelfEmployedCalculationInput = {
       taxYear: session.taxYear,
-      filingStatus: session.profileSnapshot.filingStatus,
+      filingStatus: effectiveFilingStatus,
       gross1099IncomeCents,
       businessExpensesCents,
       w2WagesCents,
-      federalWithholdingCents: withholding.totalWithholdingCents,
+      federalWithholdingCents: totalWithholdingCents,
       hasOtherSelfEmploymentIncome:
         session.incomeSnapshot.activities.length > 0 &&
         session.incomeSnapshot.form1099s.length > 0,
+      dependents: dependents.length > 0 ? dependents : undefined,
+      spouse,
     };
     return {
       calculatorType: "self_employed",
@@ -178,11 +226,13 @@ export function mapPreparationSessionToEngineInput(
 
   const input: IncomeTaxCalculationInput = {
     taxYear: session.taxYear,
-    filingStatus: session.profileSnapshot.filingStatus,
+    filingStatus: effectiveFilingStatus,
     w2WagesCents,
     otherIncomeCents: 0,
-    federalWithholdingCents: withholding.w2WithholdingCents,
+    federalWithholdingCents: totalW2WithholdingCents,
     itemizedDeductionCents: 0,
+    dependents: dependents.length > 0 ? dependents : undefined,
+    spouse,
   };
   return {
     calculatorType: "income_tax",

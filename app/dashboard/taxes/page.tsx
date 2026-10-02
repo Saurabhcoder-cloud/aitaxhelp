@@ -19,6 +19,7 @@ import {
   navigateToPreparationStep,
   calculatePreparationSession,
 } from "@/lib/utils/preparation-session-api";
+import { HouseholdPanel } from "@/components/preparation/HouseholdPanel";
 import { IncomeDiscoveryPanel } from "@/components/preparation/IncomeDiscoveryPanel";
 import { DocumentsPanel } from "@/components/preparation/DocumentsPanel";
 import { DeductionsPanel } from "@/components/preparation/DeductionsPanel";
@@ -27,7 +28,7 @@ import { listIncomeSources } from "@/lib/preparation/income";
 import { Check, Circle } from "lucide-react";
 
 const NEXT_ACTION: Record<PreparationStep, string> = {
-  taxpayer_profile: "Confirm the taxpayer profile already saved from setup.",
+  taxpayer_profile: "Review and confirm your filing status, spouse information, and dependents.",
   income: "Tell us how you made money, then save those income sources before continuing.",
   documents: "Record which tax documents you have. You can continue if some are still missing.",
   deductions: "Answer the deduction questions for your income, then save them before continuing.",
@@ -226,6 +227,14 @@ export default function StartMyTaxesPage() {
                 })}
               </ol>
 
+              {session.currentStep === "taxpayer_profile" && (
+                <HouseholdPanel
+                  session={session}
+                  onSessionChange={setSession}
+                  onContinue={handleContinue}
+                />
+              )}
+
               {session.currentStep === "income" && (
                 <IncomeDiscoveryPanel session={session} onSessionChange={setSession} />
               )}
@@ -278,6 +287,7 @@ export default function StartMyTaxesPage() {
                   </Link>
                 )}
                 {session.status !== "completed" &&
+                  session.currentStep !== "taxpayer_profile" &&
                   session.currentStep !== "income" &&
                   session.currentStep !== "documents" &&
                   session.currentStep !== "deductions" &&

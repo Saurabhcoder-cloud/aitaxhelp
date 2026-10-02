@@ -277,11 +277,20 @@ function buildDeterministicSummary(
 *Notice: This is an educational estimate computed strictly by the TaxAIHelp deterministic tax engine under statutory IRS guidelines. It does not constitute legal or certified CPA advice.*`;
   }
 
+  const creditsText = result.credits && (result.credits.totalCreditsCents > 0 || (result.totalCreditsCents && result.totalCreditsCents > 0))
+    ? `\n- **Tax Before Credits**: ${formatCurrencyFromCents(result.taxBeforeCreditsCents ?? result.federalIncomeTaxCents)}` +
+      (result.credits.childTaxCreditCents > 0 ? `\n- **Child Tax Credit (CTC)**: ${formatCurrencyFromCents(result.credits.childTaxCreditCents)}` : "") +
+      (result.credits.creditForOtherDependentsCents > 0 ? `\n- **Credit for Other Dependents (ODC)**: ${formatCurrencyFromCents(result.credits.creditForOtherDependentsCents)}` : "") +
+      (result.credits.additionalChildTaxCreditCents > 0 ? `\n- **Additional Child Tax Credit (ACTC)**: ${formatCurrencyFromCents(result.credits.additionalChildTaxCreditCents)}` : "") +
+      (result.credits.earnedIncomeCreditCents > 0 ? `\n- **Earned Income Tax Credit (EITC)**: ${formatCurrencyFromCents(result.credits.earnedIncomeCreditCents)}` : "") +
+      `\n- **Total Credits Applied**: ${formatCurrencyFromCents(result.totalCreditsCents || result.credits.totalCreditsCents)}`
+    : "";
+
   return `${prefix}
 
 - **Gross Income**: ${formatCurrencyFromCents(result.grossIncomeCents)}
 - **Standard Deduction**: ${formatCurrencyFromCents(result.deductionUsedCents)}
-- **Taxable Ordinary Income**: ${formatCurrencyFromCents(result.taxableIncomeCents)}
+- **Taxable Ordinary Income**: ${formatCurrencyFromCents(result.taxableIncomeCents)}${creditsText}
 - **Total Federal Tax Liability**: ${formatCurrencyFromCents(result.totalTaxLiabilityCents)}
 - **Effective Tax Rate**: ${(result.effectiveTaxRate * 100).toFixed(1)}%
 - **Top Marginal Bracket**: ${(result.marginalTaxBracket * 100).toFixed(0)}%
@@ -388,6 +397,46 @@ export function buildPreparationSessionDeterministicReply(
     return text;
   }
 
+  // Contextual question: Explain my credits / child tax credit / family credits / EITC
+  if (
+    lower.includes("credit") ||
+    lower.includes("child tax credit") ||
+    lower.includes("eitc") ||
+    lower.includes("earned income") ||
+    lower.includes("dependents") ||
+    lower.includes("household")
+  ) {
+    if (!calc) {
+      return (
+        `Your tax calculation has not been run yet. Once calculated, family tax credits (such as the Child Tax Credit, Credit for Other Dependents, and EITC) will be deterministically calculated by the tax engine.`
+      );
+    }
+    const cr = calc.credits;
+    if (!cr || (cr.totalCreditsCents === 0 && (!calc.totalCreditsCents || calc.totalCreditsCents === 0))) {
+      return (
+        `For tax year **${session.taxYear}**, no family tax credits were applied to your calculation based on the household data and income entered. If you have qualifying children or dependents, please verify your entries in the Taxpayer Profile & Household step.`
+      );
+    }
+    let text = `### Verified Family & Tax Credits (${session.taxYear}):\n\n`;
+    text += `- Tax Before Credits: ${formatCurrencyFromCents(calc.taxBeforeCreditsCents ?? calc.federalIncomeTaxCents)}\n`;
+    if (cr.childTaxCreditCents > 0) {
+      text += `- Child Tax Credit (CTC): ${formatCurrencyFromCents(cr.childTaxCreditCents)} (${cr.qualifyingChildrenCount} qualifying child/children under age 17)\n`;
+    }
+    if (cr.creditForOtherDependentsCents > 0) {
+      text += `- Credit for Other Dependents (ODC): ${formatCurrencyFromCents(cr.creditForOtherDependentsCents)} (${cr.otherDependentsCount} qualifying dependent(s))\n`;
+    }
+    if (cr.additionalChildTaxCreditCents > 0) {
+      text += `- Additional Child Tax Credit (ACTC, Refundable): ${formatCurrencyFromCents(cr.additionalChildTaxCreditCents)}\n`;
+    }
+    if (cr.earnedIncomeCreditCents > 0) {
+      text += `- Earned Income Tax Credit (EITC, Refundable): ${formatCurrencyFromCents(cr.earnedIncomeCreditCents)}\n`;
+    }
+    text += `- Total Family Credits Applied: ${formatCurrencyFromCents(calc.totalCreditsCents || cr.totalCreditsCents)}\n`;
+    text += `- Final Federal Tax Liability: ${formatCurrencyFromCents(calc.totalTaxLiabilityCents)}\n\n`;
+    text += `*Note: Non-refundable credits reduce your tax liability to zero, while refundable credits (like ACTC and EITC) can be paid out as part of your refund even if you owe zero tax.*`;
+    return text;
+  }
+
   // Contextual question 4: What should I review before submitting?
   if (
     lower.includes("review before submitting") ||
@@ -395,16 +444,18 @@ export function buildPreparationSessionDeterministicReply(
     lower.includes("what to review") ||
     lower.includes("checklist")
   ) {
+    const householdInfo = session.situationSummary.householdSummary;
     return (
       `### Pre-Submission Checklist for ${session.taxYear} Preparation:\n\n` +
-      `1. **Taxpayer Profile**: Verify your filing status (**${filingStatusFormatted}**) and legal name (${session.profileSnapshot.fullName || "Taxpayer"}).\n` +
+      `1. **Taxpayer & Household Profile**: Verify your filing status (**${filingStatusFormatted}**)${householdInfo?.hasSpouse ? `, spouse (${householdInfo.spouseName || "Spouse"})` : ""}${householdInfo?.dependentsCount ? `, and ${householdInfo.dependentsCount} dependent(s)` : ""}.\n` +
       `2. **Income Verification**: Ensure all income sources are reported. Currently recorded:\n` +
       `   - W-2 Wages: ${formatCurrencyFromCents(summary.whatYouToldUs.w2WagesCents)}\n` +
       `   - 1099 & Gig Gross: ${formatCurrencyFromCents(summary.whatYouToldUs.form1099GrossCents + summary.whatYouToldUs.gigBusinessGrossCents)}\n` +
       `3. **Deduction Support**: Verify recorded business costs (${formatCurrencyFromCents(summary.whatYouToldUs.expenseCents)}) and ensure you have receipts/records.\n` +
       `4. **Withholding & Payments**: Confirm federal tax withholdings match your Form W-2 Box 2 and Form 1099 statements.\n` +
-      `5. **Calculation Accuracy**: Review the deterministic tax engine results on the Tax Situation Summary.\n` +
-      `6. **Professional Handoff**: If you have complex questions or want certified assurance, you can request a licensed CPA or Enrolled Agent review directly from the preparation review page.`
+      `5. **Family Credits**: Review any Child Tax Credit, Credit for Other Dependents, or EITC applied by the deterministic tax engine.\n` +
+      `6. **Calculation Accuracy**: Review the deterministic tax engine results on the Tax Situation Summary.\n` +
+      `7. **Professional Handoff**: If you have complex questions or want certified assurance, you can request a licensed CPA or Enrolled Agent review directly from the preparation review page.`
     );
   }
 
@@ -428,14 +479,18 @@ export function buildPreparationSessionDeterministicReply(
         `- **Next step**: Your tax calculation has not been run yet. Please complete your answers and click "Run Tax Calculation" to see your verified result.`
       );
     }
+    const creditsPart = calc.totalCreditsCents && calc.totalCreditsCents > 0
+      ? `\n4.5. **Tax credits**: -${formatCurrencyFromCents(calc.totalCreditsCents)} (family credits that lowered your tax dollar-for-dollar).`
+      : "";
     return (
       `Here is how your taxes work in simple terms:\n\n` +
       `1. **Money you made**: ${formatCurrencyFromCents(calc.grossIncomeCents)} total from all your jobs and gigs.\n` +
       `2. **Money the IRS doesn't tax**: ${formatCurrencyFromCents(calc.deductionUsedCents)} (the standard deduction for ${filingStatusFormatted}).\n` +
       `3. **Income subject to tax**: ${formatCurrencyFromCents(calc.taxableIncomeCents)}.\n` +
-      `4. **Calculated tax bill**: ${formatCurrencyFromCents(calc.totalTaxLiabilityCents)}.\n` +
-      `5. **Tax you already paid during the year**: ${formatCurrencyFromCents(calc.totalPaymentsAndWithholdingCents)} (withheld from your paychecks).\n` +
-      `6. **Final score**: ${calc.estimatedRefundCents > 0 ? `You get a **refund of ${formatCurrencyFromCents(calc.estimatedRefundCents)}** because you paid more than you owed!` : calc.estimatedAmountOwedCents > 0 ? `You have an estimated **balance due of ${formatCurrencyFromCents(calc.estimatedAmountOwedCents)}** because your tax was higher than your withholdings.` : "You are completely even ($0.00)!"}`
+      `4. **Tax calculated before credits**: ${formatCurrencyFromCents(calc.taxBeforeCreditsCents ?? calc.federalIncomeTaxCents)}.${creditsPart}\n` +
+      `5. **Final calculated tax bill**: ${formatCurrencyFromCents(calc.totalTaxLiabilityCents)}.\n` +
+      `6. **Tax you already paid during the year**: ${formatCurrencyFromCents(calc.totalPaymentsAndWithholdingCents)} (withheld from your paychecks).\n` +
+      `7. **Final score**: ${calc.estimatedRefundCents > 0 ? `You get a **refund of ${formatCurrencyFromCents(calc.estimatedRefundCents)}** because you paid more than you owed!` : calc.estimatedAmountOwedCents > 0 ? `You have an estimated **balance due of ${formatCurrencyFromCents(calc.estimatedAmountOwedCents)}** because your tax was higher than your withholdings.` : "You are completely even ($0.00)!"}`
     );
   }
 
@@ -594,6 +649,23 @@ export async function processAssistantRequest(
           session.profileSnapshot.fullName ||
           session.situationSummary.taxpayerName ||
           "Taxpayer";
+        const householdInfo = session.situationSummary.householdSummary;
+        const spouseDesc = householdInfo?.hasSpouse
+          ? `Spouse: ${householdInfo.spouseName || "Included"}`
+          : "No spouse";
+        const dependentsDesc = householdInfo?.dependentsCount
+          ? `${householdInfo.dependentsCount} dependent(s) (${householdInfo.qualifyingChildrenCount} qualifying child/children for CTC, ${householdInfo.otherDependentsCount} other dependent(s))`
+          : "0 dependents";
+        const credits = calc.credits;
+        const creditsDesc = credits && (calc.totalCreditsCents || credits.totalCreditsCents > 0)
+          ? `\n- Tax Before Credits: ${formatCurrencyFromCents(calc.taxBeforeCreditsCents ?? calc.federalIncomeTaxCents)}` +
+            (credits.childTaxCreditCents > 0 ? `\n- Child Tax Credit: ${formatCurrencyFromCents(credits.childTaxCreditCents)}` : "") +
+            (credits.creditForOtherDependentsCents > 0 ? `\n- Credit for Other Dependents: ${formatCurrencyFromCents(credits.creditForOtherDependentsCents)}` : "") +
+            (credits.additionalChildTaxCreditCents > 0 ? `\n- Additional Child Tax Credit (Refundable ACTC): ${formatCurrencyFromCents(credits.additionalChildTaxCreditCents)}` : "") +
+            (credits.earnedIncomeCreditCents > 0 ? `\n- Earned Income Tax Credit (Refundable EITC): ${formatCurrencyFromCents(credits.earnedIncomeCreditCents)}` : "") +
+            `\n- Total Credits Applied: ${formatCurrencyFromCents(calc.totalCreditsCents || credits.totalCreditsCents)}`
+          : "\n- Family Credits: None applied";
+
         const prompt =
           `The user is asking: "${request.message}"\n\n` +
           `Explain this verified active Tax Preparation Session in TaxAIHelp without calculating or changing any numbers:\n` +
@@ -601,6 +673,7 @@ export async function processAssistantRequest(
           `- Session Title: ${session.title}\n` +
           `- Tax Year: ${session.taxYear}\n` +
           `- Filing Status: ${filingStatusFormatted}\n` +
+          `- Household: ${spouseDesc} · ${dependentsDesc}\n` +
           `- Current Preparation Step: ${session.currentStep} (Lifecycle Status: ${session.status})\n` +
           `- Income Sources: ${incomeSourcesList}\n` +
           `- W-2 Wages: ${formatCurrencyFromCents(session.situationSummary.whatYouToldUs.w2WagesCents)}\n` +
@@ -608,16 +681,17 @@ export async function processAssistantRequest(
           `- Confirmed Business Expenses: ${formatCurrencyFromCents(session.situationSummary.whatYouToldUs.expenseCents)}\n` +
           `- Missing Information / Requirements: ${session.situationSummary.informationStillNeeded.join("; ") || "None"}\n` +
           `- Preparation Warnings: ${session.situationSummary.warnings.join("; ") || "None"}\n\n` +
-          `VERIFIED DETERMINISTIC CALCULATION RESULT:\n` +
+          `VERIFIED DETERMINISTIC CALCULATION RESULT (Official IRS Engine Output — Do NOT Alter):\n` +
           `- Gross Income: ${formatCurrencyFromCents(calc.grossIncomeCents)}\n` +
           `- Standard Deduction: ${formatCurrencyFromCents(calc.deductionUsedCents)}\n` +
-          `- Taxable Income: ${formatCurrencyFromCents(calc.taxableIncomeCents)}\n` +
-          `- Federal Liability: ${formatCurrencyFromCents(calc.totalTaxLiabilityCents)}\n` +
+          `- Taxable Income: ${formatCurrencyFromCents(calc.taxableIncomeCents)}${creditsDesc}\n` +
+          `- Final Federal Liability: ${formatCurrencyFromCents(calc.totalTaxLiabilityCents)}\n` +
           `- Effective Rate: ${(calc.effectiveTaxRate * 100).toFixed(1)}%\n` +
           `- Top Marginal Bracket: ${(calc.marginalTaxBracket * 100).toFixed(0)}%\n` +
           `- Total Withholding / Payments: ${formatCurrencyFromCents(calc.totalPaymentsAndWithholdingCents)}\n` +
           `- Net Position: ${calc.estimatedRefundCents > 0 ? `Estimated Refund of ${formatCurrencyFromCents(calc.estimatedRefundCents)}` : calc.estimatedAmountOwedCents > 0 ? `Estimated Balance Due of ${formatCurrencyFromCents(calc.estimatedAmountOwedCents)}` : "Balanced ($0.00)"}\n` +
           `- Calculation Engine Version: v${calc.engineVersion} (Ruleset: ${calc.rulesVersion})\n\n` +
+          `CRITICAL COMPLIANCE RULE: You are an explanation engine only. Never calculate or invent numbers. Use only the exact figures provided above.\n\n` +
           `Verified Tax Drivers:\n${driversSummary}\n\n` +
           `Verified Planning Insights:\n${insightsSummary}\n\n` +
           `CRITICAL COMPLIANCE RULES:\n` +
