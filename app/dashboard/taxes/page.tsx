@@ -24,6 +24,7 @@ import { IncomeDiscoveryPanel } from "@/components/preparation/IncomeDiscoveryPa
 import { DocumentsPanel } from "@/components/preparation/DocumentsPanel";
 import { DeductionsPanel } from "@/components/preparation/DeductionsPanel";
 import { TaxSituationSummaryPanel } from "@/components/preparation/TaxSituationSummaryPanel";
+import { FederalReturnReviewPanel } from "@/components/preparation/FederalReturnReviewPanel";
 import { listIncomeSources } from "@/lib/preparation/income";
 import { Check, Circle } from "lucide-react";
 
@@ -247,6 +248,15 @@ export default function StartMyTaxesPage() {
                 <DeductionsPanel session={session} onSessionChange={setSession} />
               )}
 
+              {session.currentStep === "review" && (
+                <FederalReturnReviewPanel
+                  session={session}
+                  onNavigateToStep={handleNavigateToStep}
+                  onComplete={handleContinue}
+                  isSubmitting={isSaving}
+                />
+              )}
+
               {(session.steps.income === "completed" || session.currentStep === "calculation" || session.currentStep === "review" || session.status === "completed") && (
                 <TaxSituationSummaryPanel
                   session={session}
@@ -291,14 +301,13 @@ export default function StartMyTaxesPage() {
                   session.currentStep !== "income" &&
                   session.currentStep !== "documents" &&
                   session.currentStep !== "deductions" &&
-                  session.currentStep !== "calculation" && (
+                  session.currentStep !== "calculation" &&
+                  session.currentStep !== "review" && (
                   <Button onClick={handleContinue} disabled={isSaving}>
                     {isSaving
                       ? "Saving..."
                       : session.status === "draft"
                       ? "Start My Taxes"
-                      : session.currentStep === "review"
-                      ? "Complete Preparation"
                       : "Continue"}
                   </Button>
                 )}

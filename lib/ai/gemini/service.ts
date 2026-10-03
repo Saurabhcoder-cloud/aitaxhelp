@@ -32,6 +32,11 @@ import {
   TaxPreparationSession,
 } from "@/lib/services/tax-preparation-session-store";
 import { listIncomeSources } from "@/lib/preparation/income";
+import {
+  buildFederalReturn,
+  evaluateFederalReturnReadiness,
+  reconcileFederalReturnCalculations,
+} from "@/lib/preparation/federal-return";
 
 
 export interface DeterministicTaxToolInput {
@@ -312,6 +317,131 @@ export function buildPreparationSessionDeterministicReply(
   const summary = session.situationSummary;
   const calc = session.calculationSnapshot;
   const filingStatusFormatted = session.profileSnapshot.filingStatus.replace(/_/g, " ");
+
+  // Phase 4 Federal Return: Return Readiness & Blocking items
+  if (
+    lower.includes("return ready") ||
+    lower.includes("is my return ready") ||
+    lower.includes("why is my return incomplete") ||
+    lower.includes("why is return incomplete") ||
+    lower.includes("blocking items") ||
+    lower.includes("what blocking items") ||
+    lower.includes("return readiness") ||
+    lower.includes("ready to file")
+  ) {
+    const readiness = evaluateFederalReturnReadiness(session);
+    const statusLabel =
+      readiness.overallStatus === "complete"
+        ? "Complete & Ready for Review"
+        : readiness.overallStatus === "warning"
+        ? "Ready with Recommendations"
+        : readiness.overallStatus === "requires_review"
+        ? "Requires Calculation & Review"
+        : "Incomplete — Action Needed";
+
+    let reply = `### Federal Return Readiness Status (${session.taxYear}):\n\n`;
+    reply += `**Overall Status**: ${statusLabel}\n\n`;
+
+    if (readiness.summaryBlockingItems.length > 0) {
+      reply += `#### 🚨 Blocking Items (${readiness.summaryBlockingItems.length}):\n`;
+      for (const item of readiness.summaryBlockingItems) {
+        reply += `- ${item}\n`;
+      }
+      reply += `\n`;
+    } else {
+      reply += `No blocking items remain. All statutory return requirements have been met.\n\n`;
+    }
+
+    if (readiness.summaryWarnings.length > 0) {
+      reply += `#### ℹ️ Recommendations / Warnings (${readiness.summaryWarnings.length}):\n`;
+      for (const w of readiness.summaryWarnings) {
+        reply += `- ${w}\n`;
+      }
+      reply += `\n`;
+    }
+
+    reply += `*Readiness is evaluated deterministically against IRS filing rules for Tax Year ${session.taxYear}.*`;
+    return reply;
+  }
+
+  // Phase 4 Federal Return: Reconciliation & Mathematical Integrity
+  if (
+    lower.includes("reconcil") ||
+    lower.includes("math check") ||
+    lower.includes("sanity check") ||
+    lower.includes("are my calculations reconciled")
+  ) {
+    if (!calc) {
+      return `Your return calculations cannot be reconciled yet because the tax calculation has not been executed. Please complete your answers and run the calculation first.`;
+    }
+    const reconciliation = reconcileFederalReturnCalculations(session);
+    let reply = `### Federal Return Calculation Reconciliation (${session.taxYear}):\n\n`;
+    reply += `**Status**: ${reconciliation.isReconciled ? "✅ All 6 Mathematical Checks Passed (100% Reconciled)" : "⚠️ Reconciliation Discrepancies Found"}\n\n`;
+
+    for (const check of reconciliation.checks) {
+      reply += `- **${check.label}**: ${check.passed ? "✅ Passed" : "❌ Discrepancy"} — ${check.description}\n`;
+    }
+
+    if (reconciliation.mismatches.length > 0) {
+      reply += `\n**Discrepancies**:\n`;
+      for (const d of reconciliation.mismatches) {
+        reply += `- ${d}\n`;
+      }
+    }
+
+    reply += `\n*Every check is verified using exact integer-cent arithmetic against official statutory formulas.*`;
+    return reply;
+  }
+
+  // Phase 4 Federal Return: Form 1040 Summary & Structure
+  if (
+    lower.includes("1040 summary") ||
+    lower.includes("form 1040") ||
+    lower.includes("federal return status") ||
+    lower.includes("explain my 1040") ||
+    lower.includes("return summary") ||
+    lower.includes("federal return structure")
+  ) {
+    const fedReturn = buildFederalReturn(session);
+    let reply = `### Form 1040 Federal Return Summary (${fedReturn.metadata.taxYear}):\n\n`;
+    reply += `**Filing Status**: ${fedReturn.filingStatus.label}\n`;
+    reply += `**Taxpayer**: ${fedReturn.taxpayer.fullName || "Taxpayer"}\n`;
+    if (fedReturn.spouse.hasSpouse) {
+      reply += `**Spouse**: ${fedReturn.spouse.fullName || "Spouse"}\n`;
+    }
+    reply += `**Dependents**: ${fedReturn.dependents.length} claimed\n\n`;
+
+    reply += `#### 💵 Form 1040 Breakdown:\n`;
+    reply += `- **Line 1z (W-2 Wages)**: ${formatCurrencyFromCents(fedReturn.income.w2WagesCents)}\n`;
+    if (fedReturn.income.gross1099IncomeCents > 0 || fedReturn.income.gigBusinessGrossCents > 0) {
+      reply += `- **Line 8 / Schedule 1 (Gross Business/Gig Receipts)**: ${formatCurrencyFromCents(fedReturn.income.gross1099IncomeCents + fedReturn.income.gigBusinessGrossCents)}\n`;
+    }
+    reply += `- **Line 9 (Total Gross Income)**: ${formatCurrencyFromCents(fedReturn.income.totalGrossIncomeCents)}\n`;
+    reply += `- **Line 10 / Sched 1 Part II (Adjustments)**: -${formatCurrencyFromCents(fedReturn.adjustments.totalAboveTheLineDeductionsCents)}\n`;
+    reply += `- **Line 11 (Adjusted Gross Income - AGI)**: ${formatCurrencyFromCents(fedReturn.adjustments.adjustedGrossIncomeCents)}\n`;
+    reply += `- **Line 12 (${fedReturn.deductions.deductionType === "itemized" ? "Schedule A Itemized Deductions" : "Standard Deduction"})**: -${formatCurrencyFromCents(fedReturn.deductions.deductionUsedCents)}\n`;
+    reply += `- **Line 15 (Taxable Income)**: ${formatCurrencyFromCents(fedReturn.taxes.taxableIncomeCents)}\n`;
+    reply += `- **Line 16 (Tentative Income Tax)**: ${formatCurrencyFromCents(fedReturn.taxes.tentativeTaxCents)}\n`;
+    if (fedReturn.taxes.selfEmploymentTaxCents > 0) {
+      reply += `- **Schedule 2 (Self-Employment Tax)**: ${formatCurrencyFromCents(fedReturn.taxes.selfEmploymentTaxCents)}\n`;
+    }
+    if (fedReturn.credits.totalCreditsCents > 0) {
+      reply += `- **Tax Credits**: -${formatCurrencyFromCents(fedReturn.credits.totalCreditsCents)} (Non-refundable: ${formatCurrencyFromCents(fedReturn.credits.totalNonRefundableCreditsCents)}, Refundable: ${formatCurrencyFromCents(fedReturn.credits.totalRefundableCreditsCents)})\n`;
+    }
+    reply += `- **Line 24 (Total Tax Liability)**: ${formatCurrencyFromCents(fedReturn.taxes.totalTaxLiabilityCents)}\n`;
+    reply += `- **Line 25/33 (Total Payments & Withholdings)**: ${formatCurrencyFromCents(fedReturn.payments.totalPaymentsAndCreditsCents)}\n\n`;
+
+    if (fedReturn.refundOrBalanceDue.type === "refund") {
+      reply += `**🎉 Line 34 (Overpayment / Estimated Refund)**: **${formatCurrencyFromCents(fedReturn.refundOrBalanceDue.amountCents)}**\n`;
+    } else if (fedReturn.refundOrBalanceDue.type === "balance_due") {
+      reply += `**⚠️ Line 37 (Amount You Owe)**: **${formatCurrencyFromCents(fedReturn.refundOrBalanceDue.amountCents)}**\n`;
+    } else {
+      reply += `**Line 34/37**: Balanced ($0.00)\n`;
+    }
+
+    reply += `\n*Generated from verified deterministic session calculation snapshots for Tax Year ${fedReturn.metadata.taxYear}.*`;
+    return reply;
+  }
 
   // Contextual question 1: Why do I owe/refund this amount?
   if (
@@ -685,6 +815,11 @@ export async function processAssistantRequest(
             `\n- Total Credits Applied: ${formatCurrencyFromCents(calc.totalCreditsCents || credits.totalCreditsCents)}`
           : "\n- Family Credits: None applied";
 
+        const readiness = evaluateFederalReturnReadiness(session);
+        const reconciliation = reconcileFederalReturnCalculations(session);
+        const readinessDesc = `Federal Return Readiness: ${readiness.overallStatus} (${readiness.summaryBlockingItems.length} blocking item(s), ${readiness.summaryWarnings.length} warning(s))`;
+        const reconciliationDesc = `Mathematical Reconciliation: ${reconciliation.isReconciled ? "All 6 statutory sanity checks passed" : `${reconciliation.mismatches.length} mismatch(es)`}`;
+
         const prompt =
           `The user is asking: "${request.message}"\n\n` +
           `Explain this verified active Tax Preparation Session in TaxAIHelp without calculating or changing any numbers:\n` +
@@ -694,6 +829,8 @@ export async function processAssistantRequest(
           `- Filing Status: ${filingStatusFormatted}\n` +
           `- Household: ${spouseDesc} · ${dependentsDesc}\n` +
           `- Current Preparation Step: ${session.currentStep} (Lifecycle Status: ${session.status})\n` +
+          `- ${readinessDesc}\n` +
+          `- ${reconciliationDesc}\n` +
           `- Income Sources: ${incomeSourcesList}\n` +
           `- W-2 Wages: ${formatCurrencyFromCents(session.situationSummary.whatYouToldUs.w2WagesCents)}\n` +
           `- 1099/Gig Gross: ${formatCurrencyFromCents(session.situationSummary.whatYouToldUs.form1099GrossCents + session.situationSummary.whatYouToldUs.gigBusinessGrossCents)}\n` +
