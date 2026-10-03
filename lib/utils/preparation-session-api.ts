@@ -113,3 +113,42 @@ async function requestPreparationSession(
     };
   }
 }
+
+export interface ImportCalculatorApiResponse {
+  success: boolean;
+  data?: TaxPreparationSession | null;
+  requiresConfirmation?: boolean;
+  reason?: string;
+  error?: string;
+}
+
+export async function importCalculatorToPreparation(
+  payload: Record<string, unknown>
+): Promise<ImportCalculatorApiResponse> {
+  try {
+    const res = await fetch("/api/v1/tax/preparation/session/import-calculator", {
+      method: "POST",
+      headers: getClientAuthHeaders(),
+      body: JSON.stringify(payload),
+      cache: "no-store",
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      return {
+        success: false,
+        error: json.error?.message || json.error || "Unable to import calculation details.",
+      };
+    }
+    return {
+      success: true,
+      data: json.data as TaxPreparationSession | null,
+      requiresConfirmation: Boolean(json.requiresConfirmation),
+      reason: json.reason,
+    };
+  } catch (_err) {
+    return {
+      success: false,
+      error: "Network error occurred while importing calculation into preparation.",
+    };
+  }
+}

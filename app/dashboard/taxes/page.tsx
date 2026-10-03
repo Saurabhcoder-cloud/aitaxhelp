@@ -18,6 +18,7 @@ import {
   updatePreparationProgress,
   navigateToPreparationStep,
   calculatePreparationSession,
+  importCalculatorToPreparation,
 } from "@/lib/utils/preparation-session-api";
 import { HouseholdPanel } from "@/components/preparation/HouseholdPanel";
 import { IncomeDiscoveryPanel } from "@/components/preparation/IncomeDiscoveryPanel";
@@ -26,7 +27,7 @@ import { DeductionsPanel } from "@/components/preparation/DeductionsPanel";
 import { TaxSituationSummaryPanel } from "@/components/preparation/TaxSituationSummaryPanel";
 import { FederalReturnReviewPanel } from "@/components/preparation/FederalReturnReviewPanel";
 import { listIncomeSources } from "@/lib/preparation/income";
-import { Check, Circle } from "lucide-react";
+import { Check, Circle, AlertCircle } from "lucide-react";
 
 const NEXT_ACTION: Record<PreparationStep, string> = {
   taxpayer_profile: "Review and confirm your filing status, spouse information, and dependents.",
@@ -43,33 +44,103 @@ export default function StartMyTaxesPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [importNotification, setImportNotification] = useState<string | null>(null);
+  const [pendingConfirmation, setPendingConfirmation] = useState<{
+    payload: Record<string, unknown>;
+    reason: string;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);
+    let activeSession: TaxPreparationSession | null = null;
     const result = await fetchCurrentPreparationSession();
     if (!result.success) {
       setError(result.error || "Unable to load your preparation session.");
       setSession(null);
+      setIsLoading(false);
+      return;
     } else if (result.data) {
       setError(null);
-      setSession(result.data);
+      activeSession = result.data;
     } else {
       // If no active session exists, start the canonical preparation session workflow
       const startResult = await startPreparationSession();
       if (startResult.success && startResult.data) {
         setError(null);
-        setSession(startResult.data);
+        activeSession = startResult.data;
       } else {
-        setError(null);
-        setSession(null);
+        setError(startResult.error || null);
+        activeSession = null;
       }
     }
+
+    // Check for pending calculator transfer from sessionStorage
+    if (typeof window !== "undefined") {
+      const rawTransfer = window.sessionStorage.getItem("taxaihelp_calculator_transfer");
+      if (rawTransfer) {
+        try {
+          const parsed = JSON.parse(rawTransfer);
+          const importRes = await importCalculatorToPreparation({
+            ...parsed,
+            overwriteExisting: false,
+          });
+          if (importRes.success && importRes.data) {
+            if (importRes.requiresConfirmation) {
+              setPendingConfirmation({
+                payload: parsed,
+                reason:
+                  importRes.reason ||
+                  "You have existing preparation data. Overwrite with calculator inputs?",
+              });
+            } else {
+              activeSession = importRes.data;
+              setImportNotification(
+                "Transferred details from your calculation: filing status, income, and withholding have been populated."
+              );
+              window.sessionStorage.removeItem("taxaihelp_calculator_transfer");
+            }
+          }
+        } catch (_err) {
+          // Ignore JSON parse error
+        }
+      }
+    }
+
+    setSession(activeSession);
     setIsLoading(false);
   }, []);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const handleConfirmImport = async () => {
+    if (!pendingConfirmation) return;
+    setIsSaving(true);
+    setError(null);
+    const importRes = await importCalculatorToPreparation({
+      ...pendingConfirmation.payload,
+      overwriteExisting: true,
+    });
+    setIsSaving(false);
+    if (importRes.success && importRes.data) {
+      setSession(importRes.data);
+      setImportNotification("Preparation updated successfully with your calculator inputs.");
+      setPendingConfirmation(null);
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem("taxaihelp_calculator_transfer");
+      }
+    } else {
+      setError(importRes.error || "Failed to update preparation with calculator inputs.");
+    }
+  };
+
+  const handleDismissImport = () => {
+    setPendingConfirmation(null);
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem("taxaihelp_calculator_transfer");
+    }
+  };
 
   const handleStart = async () => {
     setIsSaving(true);
@@ -175,6 +246,47 @@ export default function StartMyTaxesPage() {
             </div>
           ) : (
             <>
+              {pendingConfirmation && (
+                <div
+                  className="rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-3"
+                  role="region"
+                  aria-label="Calculator Transfer Confirmation"
+                >
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-sm font-bold text-amber-900">Transfer Calculator Inputs?</h4>
+                      <p className="text-xs text-amber-800 mt-1">{pendingConfirmation.reason}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <Button size="sm" variant="primary" onClick={handleConfirmImport} disabled={isSaving}>
+                      {isSaving ? "Updating..." : "Yes, Update Preparation"}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleDismissImport} disabled={isSaving}>
+                      Keep Existing Details
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {importNotification && (
+                <div
+                  className="rounded-xl border border-emerald-300 bg-emerald-50 p-3.5 text-xs font-medium text-emerald-900 flex items-center justify-between gap-2"
+                  role="status"
+                >
+                  <span>✓ {importNotification}</span>
+                  <button
+                    type="button"
+                    onClick={() => setImportNotification(null)}
+                    className="text-emerald-700 hover:text-emerald-900 font-bold px-1"
+                    aria-label="Dismiss notification"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+
               <div>
                 <div className="flex items-center justify-between text-xs font-semibold text-surface-600 mb-2">
                   <span>

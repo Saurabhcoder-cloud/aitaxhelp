@@ -8,7 +8,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { saveCalculation } from "@/lib/utils/calculation-history-api";
-import { Sparkles } from "lucide-react";
+import { Sparkles, ArrowRight, FileText } from "lucide-react";
 
 export interface CalculatorResultPanelProps {
   result: TaxCalculationResult;
@@ -50,6 +50,46 @@ export function CalculatorResultPanel({
   const [isSaved, setIsSaved] = useState<boolean>(false);
   const [savedCalculationId, setSavedCalculationId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [transferNotice, setTransferNotice] = useState<string | null>(null);
+
+  const handleContinueToPreparation = () => {
+    if (result.taxYear !== 2025 && result.taxYear !== 2026) {
+      setTransferNotice(
+        `Tax preparation currently supports active filing tax years 2025 and 2026. Standalone calculations for tax year ${result.taxYear} cannot be imported into the current tax preparation workflow.`
+      );
+      return;
+    }
+
+    const transferPayload = {
+      calculatorType: result.calculatorType,
+      taxYear: result.taxYear,
+      filingStatus: result.filingStatus,
+      w2WagesCents:
+        result.calculatorType === "income_tax"
+          ? ((inputSnapshot as Record<string, unknown> | undefined)?.w2WagesCents as number | undefined ?? result.grossIncomeCents)
+          : 0,
+      contractorGrossCents:
+        result.calculatorType === "1099" ||
+        result.calculatorType === "self_employed" ||
+        result.calculatorType === "quarterly_tax"
+          ? ((inputSnapshot as Record<string, unknown> | undefined)?.grossIncomeCents as number | undefined ?? result.grossIncomeCents)
+          : 0,
+      expensesCents:
+        result.calculatorType === "self_employed"
+          ? ((inputSnapshot as Record<string, unknown> | undefined)?.expensesCents as number | undefined ?? 0)
+          : 0,
+      withholdingCents:
+        inputSnapshot?.federalWithholdingCents ?? result.totalPaymentsAndWithholdingCents ?? 0,
+    };
+
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem(
+        "taxaihelp_calculator_transfer",
+        JSON.stringify(transferPayload)
+      );
+      window.location.href = "/dashboard/taxes?import=calculator";
+    }
+  };
 
   const filingStatusFormatted = result.filingStatus
     .split("_")
@@ -154,8 +194,25 @@ export function CalculatorResultPanel({
                 )}
               </>
             )}
+
+            <Button
+              type="button"
+              size="sm"
+              variant="primary"
+              className="bg-brand-600 hover:bg-brand-700 text-white font-medium inline-flex items-center gap-1.5"
+              onClick={handleContinueToPreparation}
+            >
+              <span>Continue to Preparation</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
           </div>
         </div>
+
+        {transferNotice && (
+          <Alert variant="warning" title="Tax Preparation Compatibility" className="mb-4">
+            {transferNotice}
+          </Alert>
+        )}
 
         {/* Expandable Save Calculation Form */}
         {!hideSaveAction && showSaveDialog && !isSaved && (
@@ -543,6 +600,33 @@ export function CalculatorResultPanel({
           ))}
         </div>
       )}
+
+      {/* Preparation Continuity Callout */}
+      <div className="p-5 rounded-2xl border border-brand-200 bg-gradient-to-r from-brand-50/70 to-emerald-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center justify-center p-1 rounded-md bg-brand-100 text-brand-700">
+              <FileText className="w-4 h-4" />
+            </span>
+            <h4 className="text-sm font-bold text-surface-900">
+              Ready to prepare your {result.taxYear} tax return?
+            </h4>
+          </div>
+          <p className="text-xs text-surface-600">
+            Transfer your filing status, income figures, and withholding straight into Start My Taxes without re-typing.
+          </p>
+        </div>
+        <Button
+          type="button"
+          size="md"
+          variant="primary"
+          className="shrink-0 inline-flex items-center gap-2"
+          onClick={handleContinueToPreparation}
+        >
+          <span>Continue to Tax Preparation</span>
+          <ArrowRight className="w-4 h-4" />
+        </Button>
+      </div>
 
       {/* Authoritative Disclaimer & Engine Source Footer */}
       <div className="p-4 rounded-xl border border-surface-200 bg-surface-50 text-xs text-surface-500 space-y-2">

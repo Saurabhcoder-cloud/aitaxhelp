@@ -34,6 +34,7 @@ import {
   emptyStepMap,
 } from "@/lib/preparation/steps";
 import { executePreparationCalculation } from "@/lib/preparation/calculation";
+import { ImportCalculatorSessionInput } from "@/lib/validations/preparation-session";
 
 export interface TaxPreparationSession {
   id: string;
@@ -242,6 +243,44 @@ export class TaxPreparationSessionStore {
   }
 
   /**
+   * Returns the user's latest preparation session (open or completed).
+   */
+  public static async getLatest(userId: string): Promise<TaxPreparationSession | null> {
+    if (SUPABASE_CONFIG.isConfigured()) {
+      try {
+        const supabase = getServerSupabaseClient() as unknown as {
+          from: (tbl: string) => {
+            select: (cols: string) => {
+              eq: (col: string, val: string) => {
+                order: (col: string, opts: { ascending: boolean }) => {
+                  limit: (n: number) => {
+                    maybeSingle: () => Promise<{ data: PreparationSessionRow | null; error: unknown }>;
+                  };
+                };
+              };
+            };
+          };
+        };
+        const res = await supabase
+          .from("tax_preparation_sessions")
+          .select("*")
+          .eq("user_id", userId)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        return res.data ? fromRow(res.data) : null;
+      } catch (_e) {
+        return null;
+      }
+    }
+
+    const all = Array.from(getMemoryStore().values())
+      .filter((session) => session.userId === userId)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    return all[0] ? toPublic(all[0]) : null;
+  }
+
+  /**
    * Retrieves a tax preparation session by its unique ID.
    * If userId is provided, validates caller ownership.
    */
@@ -344,6 +383,149 @@ export class TaxPreparationSessionStore {
 
     getMemoryStore().set(record.id, record);
     return { session: toPublic(record), created: true };
+  }
+
+  /**
+   * Imports validated inputs from standalone free calculators into the user's
+   * tax preparation session with conflict checking and confirmation semantics.
+   *
+   * SECURITY & INVARIANTS:
+   * - Only inputs are imported (taxYear, filingStatus, gross income, withholding).
+   * - Client calculated tax totals are NEVER accepted or imported as authoritative.
+   * - Returns { session, requiresConfirmation: true, reason } if session already has data
+   *   and overwriteExisting is false.
+   */
+  public static async importFromCalculator(
+    userId: string,
+    input: ImportCalculatorSessionInput,
+    email?: string
+  ): Promise<{
+    session: TaxPreparationSession;
+    requiresConfirmation: boolean;
+    reason?: string;
+  }> {
+    const existing = await this.getCurrent(userId);
+
+    // If an existing session is in progress or completed and not forced overwrite:
+    if (existing && !input.overwriteExisting) {
+      const hasIncomeData =
+        existing.incomeSnapshot.w2s.length > 0 ||
+        existing.incomeSnapshot.form1099s.length > 0 ||
+        existing.incomeSnapshot.activities.length > 0;
+
+      if (hasIncomeData) {
+        return {
+          session: existing,
+          requiresConfirmation: true,
+          reason: `You already have saved income details in your ${existing.taxYear} preparation session. Do you want to update it with your calculator inputs?`,
+        };
+      }
+    }
+
+    if (!existing && !input.overwriteExisting) {
+      const latest = await this.getLatest(userId);
+      if (latest && latest.status === "completed" && latest.taxYear === input.taxYear) {
+        return {
+          session: latest,
+          requiresConfirmation: true,
+          reason: `You have an existing completed tax preparation session for tax year ${latest.taxYear}. Do you want to overwrite it with your calculator inputs?`,
+        };
+      }
+    }
+
+    const situations: ("employer" | "freelance" | "gig" | "business")[] = [];
+    const w2s = [];
+    const form1099s = [];
+    const activities = [];
+
+    if (input.w2WagesCents && input.w2WagesCents > 0) {
+      situations.push("employer");
+      w2s.push({
+        id: crypto.randomUUID(),
+        employerName: "Primary Employer (Calculator Transfer)",
+        wagesCents: input.w2WagesCents,
+        federalWithholdingCents: input.withholdingCents || 0,
+      });
+    }
+
+    if (input.contractorGrossCents && input.contractorGrossCents > 0) {
+      situations.push("freelance");
+      form1099s.push({
+        id: crypto.randomUUID(),
+        incomeType: "freelance" as const,
+        payerName: "Primary Client (Calculator Transfer)",
+        grossIncomeCents: input.contractorGrossCents,
+        federalWithholdingCents: input.w2WagesCents ? 0 : input.withholdingCents || 0,
+      });
+    }
+
+    if (input.expensesCents && input.expensesCents > 0) {
+      situations.push("business");
+      activities.push({
+        id: crypto.randomUUID(),
+        kind: "business" as const,
+        activityName: "Independent Contracting / Business",
+        grossReceiptsCents: input.contractorGrossCents || 0,
+        equipmentSuppliesCents: input.expensesCents,
+        softwareSubscriptionsCents: 0,
+        homeOfficeVehicleCents: 0,
+        otherExpensesCents: 0,
+      });
+    }
+
+    if (situations.length === 0) {
+      situations.push("employer");
+    }
+
+    const targetSession = existing || (await this.start(userId, email)).session;
+
+    const updatedProfileSnapshot = {
+      ...targetSession.profileSnapshot,
+      filingStatus: input.filingStatus,
+      taxYear: input.taxYear as TaxYear,
+      hasW2Income: (input.w2WagesCents || 0) > 0,
+      has1099Income: (input.contractorGrossCents || 0) > 0,
+      hasBusinessExpenses: (input.expensesCents || 0) > 0,
+    };
+
+    const updatedHousehold = {
+      ...targetSession.householdSnapshot,
+      filingStatus: input.filingStatus,
+    };
+
+    const updatedIncome = {
+      situations: Array.from(new Set(situations)),
+      w2s,
+      form1099s,
+      activities,
+    };
+
+    const updatedSteps = {
+      ...targetSession.steps,
+      taxpayer_profile: "completed" as const,
+      income: "current" as const,
+    };
+
+    const updatedSession: TaxPreparationSession = {
+      ...targetSession,
+      taxYear: input.taxYear as TaxYear,
+      title: `${input.taxYear} Tax Preparation`,
+      status: "in_progress",
+      currentStep: "income",
+      steps: updatedSteps,
+      profileSnapshot: updatedProfileSnapshot,
+      householdSnapshot: updatedHousehold,
+      incomeSnapshot: updatedIncome,
+      calculationId: null,
+      calculationSnapshot: null,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const persisted = await this.persist(updatedSession);
+    return {
+      session: persisted,
+      requiresConfirmation: false,
+    };
   }
 
   /**
