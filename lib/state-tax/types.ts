@@ -1,13 +1,13 @@
 /**
- * State Tax Domain Model — Phase 7
+ * State Tax Domain Model — Phase 11
  *
  * Provides a canonical, type-safe representation of state income tax returns,
  * taxpayers, residency types, state adjustments, deductions, credits,
- * liabilities, withholdings, readiness, and metadata.
+ * liabilities, withholdings, readiness, document generation, and e-file lifecycle.
  *
  * ARCHITECTURAL INVARIANT:
  * This domain model is cleanly separated from FederalReturn.
- * The deterministic tax engine is the sole authority for tax numbers.
+ * The deterministic state tax engine is the sole authority for state tax numbers.
  * Zero state tax calculations are performed in UI components or LLMs.
  */
 
@@ -30,6 +30,13 @@ export type StateRefundOrBalanceType =
   | "zero"
   | "not_calculated";
 
+export type StateSupportTier =
+  | "SUPPORTED"
+  | "SUPPORTED_PARTIAL"
+  | "NOT_SUPPORTED"
+  | "NO_INCOME_TAX"
+  | "REQUIRES_STATE_RULES";
+
 // =============================================================================
 // 1. STATE TAXPAYER & FILING STATUS
 // =============================================================================
@@ -40,6 +47,8 @@ export interface StateTaxpayer {
   residencyType: StateResidencyType;
   residentSince?: string;
   isClaimedAsDependent?: boolean;
+  priorStateOfResidence?: string;
+  moveDate?: string;
 }
 
 export interface StateSpouse {
@@ -122,6 +131,7 @@ export interface StateCreditItem {
   code: string;
   amountCents: number;
   isRefundable: boolean;
+  description?: string;
 }
 
 export interface StateCredits {
@@ -141,6 +151,7 @@ export interface StateTaxLiability {
   netStateTaxCents: number; // Gross tax minus non-refundable credits
   effectiveTaxRate: number;
   marginalTaxBracket: number;
+  otherStateTaxesCents?: number; // e.g. CA Mental Health Services Tax
 }
 
 export interface StateWithholdingRecord {
@@ -184,7 +195,14 @@ export type StateValidationCategory =
   | "INCOME_ALLOCATION"
   | "WITHHOLDING_PAYMENTS"
   | "CALCULATION_ENGINE"
-  | "FEDERAL_PREREQUISITE";
+  | "FEDERAL_PREREQUISITE"
+  | "RESIDENCY_CLASSIFICATION"
+  | "STATE_SOURCE_INCOME"
+  | "STATE_ADJUSTMENTS"
+  | "STATE_DEDUCTIONS"
+  | "STATE_CREDITS"
+  | "DOCUMENT_READINESS"
+  | "RECONCILIATION_INTEGRITY";
 
 export type StateValidationCode =
   | "STATE_NOT_SUPPORTED"
@@ -195,7 +213,14 @@ export type StateValidationCode =
   | "STATE_WITHHOLDING_REVIEW"
   | "FEDERAL_RETURN_REQUIRED"
   | "STATE_DATA_INCOMPLETE"
-  | "CALCULATION_NOT_EXECUTED";
+  | "CALCULATION_NOT_EXECUTED"
+  | "RESIDENCY_INCOMPLETE"
+  | "STATE_SOURCE_ALLOCATION_MISSING"
+  | "STATE_DEDUCTION_ERROR"
+  | "STATE_CREDIT_INELIGIBLE"
+  | "STATE_RECONCILIATION_MISMATCH"
+  | "STATE_DOCUMENT_GENERATION_FAILED"
+  | "STATE_RETURN_TAMPERED";
 
 export interface StateValidationError {
   code: StateValidationCode;
@@ -247,6 +272,10 @@ export interface StateTaxMetadata {
   isEngineSupported: boolean;
   federalReturnVersion: string;
   generatedAt: string;
+  checksumSha256?: string;
+  isFrozen?: boolean;
+  frozenAt?: string | null;
+  supportTier?: StateSupportTier;
 }
 
 export interface StateReturn {
@@ -285,6 +314,13 @@ export interface StateCalculationInput {
   qualifyingChildrenCount: number;
   qualifyingDependentsCount: number;
   stateWithholdingCents: number;
+  stateEstimatedPaymentsCents?: number;
+  nonresidentIncomeAllocationPercentage?: number; // 0 - 100
+  priorStateCode?: string;
+  moveDate?: string;
+  stateAdditionsCents?: number;
+  stateSubtractionsCents?: number;
+  hasUnder6Child?: boolean;
   multiStateRecords?: StateIncomeAllocationRecord[];
   customStateInputs?: Record<string, unknown>;
 }
@@ -301,6 +337,7 @@ export interface StateCalculationResult {
   netStateTaxCents: number;
   refundableCreditsCents: number;
   totalWithholdingCents: number;
+  estimatedPaymentsCents?: number;
   refundOrBalanceCents: number;
   refundOrBalanceType: StateRefundOrBalanceType;
   effectiveTaxRate: number;
@@ -310,5 +347,87 @@ export interface StateCalculationResult {
     subtractionsCents: number;
     deductionUsedCents: number;
     exemptionsCents: number;
+    taxableIncomeBeforeDeductionsCents?: number;
+    personalExemptionCreditCents?: number;
+    dependentExemptionCreditCents?: number;
+    calEitcCents?: number;
+    youngChildCreditCents?: number;
+    mentalHealthServicesTaxCents?: number;
   };
+}
+
+// =============================================================================
+// 9. STATE DOCUMENT DESCRIPTORS & PACKAGES
+// =============================================================================
+
+export interface StateReturnDocumentDescriptor {
+  id: string;
+  title: string;
+  formNumber: string;
+  category: "MAIN_RETURN" | "SCHEDULE" | "WORKSHEET" | "DISCLOSURE" | "SUMMARY";
+  description: string;
+  isOfficialForm: boolean;
+  status: "READY" | "NOT_REQUIRED" | "NOT_SUPPORTED";
+  generatedAt: string;
+}
+
+export interface StateReturnPackage {
+  returnId: string;
+  stateCode: string;
+  stateName: string;
+  taxYear: TaxYear;
+  isSupported: boolean;
+  stateReturn: StateReturn;
+  documents: StateReturnDocumentDescriptor[];
+  generatedAt: string;
+}
+
+// =============================================================================
+// 10. STATE E-FILE LIFECYCLE & SUBMISSION
+// =============================================================================
+
+export type StateEfileLifecycleStatus =
+  | "NOT_READY"
+  | "READY"
+  | "FROZEN"
+  | "SUBMISSION_PENDING"
+  | "SUBMITTING"
+  | "SUBMITTED"
+  | "ACKNOWLEDGED"
+  | "ACCEPTED"
+  | "REJECTED"
+  | "FAILED";
+
+export interface StateEfileSubmission {
+  id: string;
+  sessionId: string;
+  userId: string;
+  stateCode: string;
+  taxYear: TaxYear;
+  status: StateEfileLifecycleStatus;
+  providerId: string;
+  providerSubmissionId?: string | null;
+  providerStatus?: string | null;
+  providerMessage?: string | null;
+  stateAcknowledgmentNumber?: string | null;
+  rejectionCodes?: string[];
+  rejectionDetails?: string[];
+  snapshotChecksum: string;
+  submittedAt?: string | null;
+  acknowledgedAt?: string | null;
+  acceptedAt?: string | null;
+  rejectedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StateEfileSubmissionEvent {
+  id: string;
+  submissionId: string;
+  eventType: string;
+  fromStatus?: StateEfileLifecycleStatus | null;
+  toStatus: StateEfileLifecycleStatus;
+  message: string;
+  timestamp: string;
+  payload?: Record<string, unknown>;
 }

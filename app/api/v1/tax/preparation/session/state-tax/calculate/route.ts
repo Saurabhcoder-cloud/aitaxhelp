@@ -4,6 +4,8 @@ import { TaxPreparationSessionStore } from "@/lib/services/tax-preparation-sessi
 import { buildFederalReturn } from "@/lib/preparation/federal-return";
 import { mapFederalReturnToStateInput } from "@/lib/state-tax/federal-bridge";
 import { getStateSupportInfo, getStateEngine } from "@/lib/state-tax/registry";
+import { buildStateReturn } from "@/lib/state-tax/state-return-builder";
+import { StateTaxReturnStore } from "@/lib/services/state-tax-return-store";
 import { AppError, handleApiError } from "@/lib/utils/errors";
 
 /**
@@ -56,6 +58,14 @@ export async function POST(req: NextRequest) {
 
     const engine = getStateEngine(stateInput.stateCode);
     const result = engine.calculateStateTax(stateInput);
+
+    // Build and persist state return snapshot
+    try {
+      const stateReturn = buildStateReturn(session, federalReturn);
+      await StateTaxReturnStore.saveStateReturn(stateReturn);
+    } catch (_err) {
+      // In-memory fallback / non-fatal
+    }
 
     return NextResponse.json({
       success: true,

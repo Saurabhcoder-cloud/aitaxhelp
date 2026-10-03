@@ -4,15 +4,18 @@ import { TaxPreparationSessionStore } from "@/lib/services/tax-preparation-sessi
 import { buildFederalReturn } from "@/lib/preparation/federal-return";
 import { buildStateTaxSummary } from "@/lib/state-tax/summary";
 import { buildStateBridgeData } from "@/lib/state-tax/federal-bridge";
+import { buildStateReturn } from "@/lib/state-tax/state-return-builder";
+import { isStateSupported } from "@/lib/state-tax/registry";
+import { StateTaxReturnStore } from "@/lib/services/state-tax-return-store";
 import { AppError, handleApiError } from "@/lib/utils/errors";
 
 /**
  * GET /api/v1/tax/preparation/session/state-tax
- * Retrieves the state tax overview, bridge data, and summary for the authenticated user.
+ * Retrieves the state tax overview, bridge data, canonical state return, and summary for the authenticated user.
  *
  * SECURITY:
- * - Session ownership is strictly enforced via the verified session token.
- * - Federal return is reconstructed server-side; client cannot supply numbers.
+ * - Session ownership is strictly enforced via verified session token.
+ * - State return is reconstructed server-side; client cannot supply numbers.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -30,11 +33,23 @@ export async function GET(req: NextRequest) {
     const summary = buildStateTaxSummary(session, federalReturn);
     const bridge = buildStateBridgeData(session, federalReturn);
 
+    let stateReturn = null;
+    if (isStateSupported(summary.stateCode)) {
+      try {
+        // Check if an authoritative frozen or stored state return exists
+        const stored = await StateTaxReturnStore.getStateReturn(session.id, summary.stateCode);
+        stateReturn = stored || buildStateReturn(session, federalReturn);
+      } catch (_err) {
+        // Fallback gracefully
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         summary,
         bridge,
+        stateReturn,
       },
     });
   } catch (error) {

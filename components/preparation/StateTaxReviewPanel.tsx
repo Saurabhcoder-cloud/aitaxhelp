@@ -16,9 +16,12 @@ import {
   ExternalLink,
   ShieldCheck,
   RefreshCw,
+  Lock,
+  FileText,
+  Calculator,
 } from "lucide-react";
 import { StateTaxSummary } from "@/lib/state-tax/summary";
-import { StateReadiness } from "@/lib/state-tax/types";
+import { StateReadiness, StateReturn } from "@/lib/state-tax/types";
 
 interface StateTaxReviewPanelProps {
   initialSummary?: StateTaxSummary | null;
@@ -41,10 +44,14 @@ export function StateTaxReviewPanel({
   className = "",
 }: StateTaxReviewPanelProps) {
   const [summary, setSummary] = useState<StateTaxSummary | null>(initialSummary || null);
+  const [stateReturn, setStateReturn] = useState<StateReturn | null>(null);
   const [readiness, setReadiness] = useState<StateReadiness | null>(null);
+  const [isFrozen, setIsFrozen] = useState(false);
   const [isLoading, setIsLoading] = useState(!initialSummary);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [isFreezing, setIsFreezing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(true);
 
   useEffect(() => {
@@ -57,18 +64,24 @@ export function StateTaxReviewPanel({
     setIsLoading(true);
     setError(null);
     try {
-      const [summaryRes, readinessRes] = await Promise.all([
+      const [overviewRes, readinessRes, statusRes] = await Promise.all([
         fetch("/api/v1/tax/preparation/session/state-tax"),
         fetch("/api/v1/tax/preparation/session/state-tax/readiness"),
+        fetch("/api/v1/tax/preparation/session/state-tax/efile/status"),
       ]);
 
-      if (summaryRes.ok) {
-        const sumData = await summaryRes.json();
-        setSummary(sumData.data?.summary || null);
+      if (overviewRes.ok) {
+        const ovData = await overviewRes.json();
+        setSummary(ovData.data?.summary || null);
+        setStateReturn(ovData.data?.stateReturn || null);
       }
       if (readinessRes.ok) {
         const readData = await readinessRes.json();
         setReadiness(readData.data || null);
+      }
+      if (statusRes.ok) {
+        const statData = await statusRes.json();
+        setIsFrozen(Boolean(statData.data?.isFrozen));
       }
     } catch (_err) {
       setError("Unable to load state tax data.");
@@ -80,6 +93,7 @@ export function StateTaxReviewPanel({
   async function handleCalculateStateTax() {
     setIsCalculating(true);
     setError(null);
+    setSuccessMessage(null);
     try {
       const res = await fetch("/api/v1/tax/preparation/session/state-tax/calculate", {
         method: "POST",
@@ -88,6 +102,7 @@ export function StateTaxReviewPanel({
       if (!res.ok) {
         setError(data.error?.message || "State tax calculation is unavailable.");
       } else {
+        setSuccessMessage("State tax calculated deterministically.");
         await loadStateTaxData();
       }
     } catch (_err) {
@@ -97,11 +112,35 @@ export function StateTaxReviewPanel({
     }
   }
 
+  async function handleFreezeStateReturn() {
+    setIsFreezing(true);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const res = await fetch("/api/v1/tax/preparation/session/state-tax/freeze", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error?.message || "Failed to freeze state return.");
+      } else {
+        setIsFrozen(true);
+        setSuccessMessage("State return frozen with cryptographic SHA-256 digest.");
+        await loadStateTaxData();
+      }
+    } catch (_err) {
+      setError("Failed to freeze state return.");
+    } finally {
+      setIsFreezing(false);
+    }
+  }
+
   const effectiveState = summary?.stateCode || propStateCode || "—";
   const stateName = summary?.stateName || effectiveState;
   const isNoTax = summary?.supportStatus === "NO_STATE_INCOME_TAX";
   const isSupported = summary?.supportStatus === "SUPPORTED";
   const isUnsupported = !isNoTax && !isSupported;
+  const refundOrBalance = summary?.financials?.refundOrBalanceType;
 
   return (
     <Card className={`border-surface-200 overflow-hidden ${className}`}>
@@ -121,9 +160,15 @@ export function StateTaxReviewPanel({
             {isNoTax
               ? "No State Income Tax"
               : isSupported
-              ? "State Supported"
+              ? "Certified Engine Active"
               : "Preparation Not Yet Supported"}
           </Badge>
+          {isFrozen && (
+            <Badge variant="brand" className="text-xs flex items-center gap-1">
+              <Lock className="w-3 h-3" />
+              <span>Snapshot Frozen</span>
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {isExpanded ? (
@@ -146,7 +191,7 @@ export function StateTaxReviewPanel({
                 </span>
                 <p className="text-[11px] text-surface-500">
                   Tax Year {summary?.taxYear || taxYear} • Filing Status:{" "}
-                  {summary?.filingStatusLabel || "Standard Resident"}
+                  {summary?.filingStatusLabel || "Standard Resident"} • Engine: {summary?.engineVersion || "v2025_v1"}
                 </p>
               </div>
             </div>
@@ -191,52 +236,118 @@ export function StateTaxReviewPanel({
             </div>
           )}
 
-          {/* State Financials & Income Indicators */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            <div className="p-3 rounded-lg border border-surface-200 bg-surface-50/50 space-y-1">
-              <span className="text-[10px] uppercase font-semibold text-surface-500">Federal AGI Considered</span>
-              <p className="text-sm font-bold text-surface-900">
-                {formatCurrency(summary?.financials?.incomeConsideredCents || 0)}
-              </p>
-              <span className="text-[10px] text-surface-500">Bridged from Form 1040 Line 11</span>
-            </div>
-
-            <div className="p-3 rounded-lg border border-surface-200 bg-surface-50/50 space-y-1">
-              <span className="text-[10px] uppercase font-semibold text-surface-500">State Withholding</span>
-              <p className="text-sm font-bold text-surface-900">
-                {formatCurrency(summary?.financials?.stateWithholdingCents || 0)}
-              </p>
-              <span className="text-[10px] text-surface-500">Recorded state prepayments</span>
-            </div>
-
-            <div className="p-3 rounded-lg border border-surface-200 bg-surface-50/50 space-y-1">
-              <span className="text-[10px] uppercase font-semibold text-surface-500">State Tax Liability</span>
-              <p className="text-sm font-bold text-surface-900">
-                {isNoTax
-                  ? "$0.00 (Exempt)"
-                  : isSupported
-                  ? formatCurrency(summary?.financials?.netTaxLiabilityCents || 0)
-                  : "Not Calculated"}
-              </p>
-              <span className="text-[10px] text-surface-500">
-                {isNoTax ? "Zero state tax liability" : isSupported ? "Deterministic calculation" : "Requires state engine"}
-              </span>
-            </div>
-          </div>
-
-          {/* Calculation Trigger / Refresh */}
+          {/* State Financials & Calculation Breakdown */}
           {isSupported && (
-            <div className="flex items-center justify-between pt-2 border-t border-surface-100">
-              <span className="text-xs text-surface-600">Certified engine active (v{summary?.engineVersion})</span>
-              <Button
-                onClick={handleCalculateStateTax}
-                disabled={isCalculating}
-                size="sm"
-                className="bg-brand-600 hover:bg-brand-700 text-white text-xs"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 mr-1 ${isCalculating ? "animate-spin" : ""}`} />
-                {isCalculating ? "Calculating..." : "Calculate State Tax"}
-              </Button>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="p-2.5 rounded-lg border border-surface-200 bg-surface-50/50 space-y-1">
+                  <span className="text-[10px] uppercase font-semibold text-surface-500">Federal AGI Bridged</span>
+                  <p className="text-sm font-bold text-surface-900">
+                    {formatCurrency(summary?.financials?.incomeConsideredCents || 0)}
+                  </p>
+                </div>
+
+                <div className="p-2.5 rounded-lg border border-surface-200 bg-surface-50/50 space-y-1">
+                  <span className="text-[10px] uppercase font-semibold text-surface-500">State Standard Deduction</span>
+                  <p className="text-sm font-bold text-surface-900">
+                    {formatCurrency(summary?.financials?.deductionUsedCents || 0)}
+                  </p>
+                </div>
+
+                <div className="p-2.5 rounded-lg border border-surface-200 bg-surface-50/50 space-y-1">
+                  <span className="text-[10px] uppercase font-semibold text-surface-500">State Taxable Income</span>
+                  <p className="text-sm font-bold text-surface-900">
+                    {formatCurrency(summary?.financials?.stateTaxableIncomeCents || 0)}
+                  </p>
+                </div>
+
+                <div className="p-2.5 rounded-lg border border-surface-200 bg-surface-50/50 space-y-1">
+                  <span className="text-[10px] uppercase font-semibold text-surface-500">Gross State Tax</span>
+                  <p className="text-sm font-bold text-surface-900">
+                    {formatCurrency(summary?.financials?.grossTaxCents || 0)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="p-2.5 rounded-lg border border-surface-200 bg-surface-50/50 space-y-1">
+                  <span className="text-[10px] uppercase font-semibold text-surface-500">State Credits</span>
+                  <p className="text-sm font-bold text-surface-900">
+                    {formatCurrency(summary?.financials?.totalCreditsCents || 0)}
+                  </p>
+                </div>
+
+                <div className="p-2.5 rounded-lg border border-surface-200 bg-surface-50/50 space-y-1">
+                  <span className="text-[10px] uppercase font-semibold text-surface-500">Net State Liability</span>
+                  <p className="text-sm font-bold text-surface-900">
+                    {formatCurrency(summary?.financials?.netTaxLiabilityCents || 0)}
+                  </p>
+                </div>
+
+                <div className="p-2.5 rounded-lg border border-surface-200 bg-surface-50/50 space-y-1">
+                  <span className="text-[10px] uppercase font-semibold text-surface-500">Withholding & Prepayments</span>
+                  <p className="text-sm font-bold text-surface-900">
+                    {formatCurrency(summary?.financials?.totalPaymentsCents || 0)}
+                  </p>
+                </div>
+
+                <div className={`p-2.5 rounded-lg border space-y-1 ${
+                  refundOrBalance === "refund"
+                    ? "border-emerald-200 bg-emerald-50/60 text-emerald-900"
+                    : refundOrBalance === "balance_due"
+                    ? "border-amber-200 bg-amber-50/60 text-amber-900"
+                    : "border-surface-200 bg-surface-50/50 text-surface-900"
+                }`}>
+                  <span className="text-[10px] uppercase font-semibold">
+                    {refundOrBalance === "refund" ? "Estimated Refund" : refundOrBalance === "balance_due" ? "Estimated Balance Due" : "Net Balance"}
+                  </span>
+                  <p className="text-sm font-bold">
+                    {formatCurrency(summary?.financials?.refundOrBalanceCents || 0)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Action Row */}
+          {isSupported && (
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-surface-100">
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleCalculateStateTax}
+                  disabled={isCalculating}
+                  size="sm"
+                  className="bg-brand-600 hover:bg-brand-700 text-white text-xs"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isCalculating ? "animate-spin" : ""}`} />
+                  {isCalculating ? "Calculating..." : "Recalculate State Tax"}
+                </Button>
+
+                {!isFrozen && (
+                  <Button
+                    onClick={handleFreezeStateReturn}
+                    disabled={isFreezing}
+                    size="sm"
+                    variant="outline"
+                    className="text-xs border-surface-300"
+                  >
+                    <Lock className="w-3.5 h-3.5 mr-1.5 text-surface-600" />
+                    {isFreezing ? "Freezing..." : "Freeze State Return"}
+                  </Button>
+                )}
+              </div>
+
+              <div className="text-[11px] text-surface-500 flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-surface-400" />
+                <span>Preparation Summary — Not an Official State Filing Form</span>
+              </div>
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="flex items-center gap-1.5 p-2 rounded bg-emerald-50 text-emerald-700 text-xs border border-emerald-200">
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+              <span>{successMessage}</span>
             </div>
           )}
 

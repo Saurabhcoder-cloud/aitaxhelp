@@ -1,12 +1,12 @@
 /**
- * State Document Architecture — Phase 7
+ * State Document Architecture — Phase 11
  *
- * Provides document provider abstractions for future state tax forms and reports.
+ * Provides document provider abstractions for state tax forms, worksheets, and summaries.
  *
  * ARCHITECTURAL INVARIANT:
- * Never generate fake official state tax forms (e.g. Form 540, Form IT-201).
- * Never claim state documents are ready for official submission unless genuine,
- * verified state statutory PDF generators are active.
+ * Never generate documents that falsely claim to be official state tax forms (e.g. Form 540).
+ * Instead, generate a clear "State Tax Preparation Summary" labeled:
+ * "Preparation Summary — Not an Official State Filing Form"
  */
 
 import { TaxYear } from "@/types/tax";
@@ -17,6 +17,7 @@ export interface StateDocumentItem {
   id: string;
   title: string;
   formNumber: string;
+  category?: "MAIN_RETURN" | "SCHEDULE" | "WORKSHEET" | "DISCLOSURE" | "SUMMARY";
   description: string;
   isOfficialForm: boolean;
   status: "ready" | "not_supported" | "not_required";
@@ -41,8 +42,10 @@ export interface IStateReturnDocumentProvider {
 }
 
 /**
- * Baseline State Document Provider that handles all 50 states + DC safely.
- * Discloses genuine form support and provides state revenue department references.
+ * State Document Provider that handles all 50 states + DC safely.
+ * For supported states (e.g. CA), generates a certified State Tax Preparation Summary.
+ * For no-tax states, generates an Exemption Certificate.
+ * For unsupported states, generates an Advisory Notice.
  */
 export class DefaultStateDocumentProvider implements IStateReturnDocumentProvider {
   constructor(public readonly stateCode: string) {}
@@ -56,6 +59,9 @@ export class DefaultStateDocumentProvider implements IStateReturnDocumentProvide
     if (info?.supportStatus === "NO_STATE_INCOME_TAX") {
       return ["STATE_EXEMPTION_SUMMARY"];
     }
+    if (info?.supportStatus === "SUPPORTED") {
+      return ["STATE_PREPARATION_SUMMARY", "STATE_CREDITS_WORKSHEET"];
+    }
     return [];
   }
 
@@ -64,6 +70,7 @@ export class DefaultStateDocumentProvider implements IStateReturnDocumentProvide
     const stateName = info?.stateName || this.stateCode;
     const now = new Date().toISOString();
 
+    // Case 1: No income tax state
     if (info?.supportStatus === "NO_STATE_INCOME_TAX") {
       return {
         stateCode: this.stateCode,
@@ -72,9 +79,10 @@ export class DefaultStateDocumentProvider implements IStateReturnDocumentProvide
         isSupported: true,
         documents: [
           {
-            id: `doc-${this.stateCode}-exemption`,
+            id: `doc-${this.stateCode.toLowerCase()}-exemption`,
             title: `${stateName} State Tax Exemption Certificate`,
             formNumber: "EXEMPT-NO-TAX",
+            category: "SUMMARY",
             description: `Official documentation that ${stateName} imposes no personal individual income tax on wages for Tax Year ${summary.taxYear}.`,
             isOfficialForm: false,
             status: "not_required",
@@ -86,7 +94,40 @@ export class DefaultStateDocumentProvider implements IStateReturnDocumentProvide
       };
     }
 
-    // State has income tax, but official forms are not currently generated
+    // Case 2: Supported state with certified engine (e.g. California)
+    if (info?.supportStatus === "SUPPORTED") {
+      return {
+        stateCode: this.stateCode,
+        stateName,
+        taxYear: summary.taxYear,
+        isSupported: true,
+        documents: [
+          {
+            id: `doc-${this.stateCode.toLowerCase()}-summary`,
+            title: `${stateName} State Tax Preparation Summary`,
+            formNumber: "STATE-PREP-SUMMARY",
+            category: "SUMMARY",
+            description: `Preparation Summary — Not an Official State Filing Form. Contains verified deterministic ${stateName} taxable income, exemption credits, and net tax liability.`,
+            isOfficialForm: false,
+            status: "ready",
+          },
+          {
+            id: `doc-${this.stateCode.toLowerCase()}-credits-worksheet`,
+            title: `${stateName} Exemption & Tax Credits Worksheet`,
+            formNumber: "STATE-CREDITS-WORKSHEET",
+            category: "WORKSHEET",
+            description: `Statutory calculation of ${stateName} personal exemption credits, dependent credits, and state refundable credits.`,
+            isOfficialForm: false,
+            status: "ready",
+          },
+        ],
+        summary,
+        notice: `Preparation Summary — Not an Official State Filing Form. TaxAIHelp provides verified deterministic calculation summaries to assist in state tax preparation.`,
+        generatedAt: now,
+      };
+    }
+
+    // Case 3: State has income tax, but official forms are not currently generated
     return {
       stateCode: this.stateCode,
       stateName,
@@ -94,9 +135,10 @@ export class DefaultStateDocumentProvider implements IStateReturnDocumentProvide
       isSupported: false,
       documents: [
         {
-          id: `doc-${this.stateCode}-summary`,
+          id: `doc-${this.stateCode.toLowerCase()}-advisory`,
           title: `${stateName} State Filing Advisory Notice`,
           formNumber: "STATE-ADVISORY",
+          category: "DISCLOSURE",
           description: `Official ${stateName} state income tax return forms are not provided by TaxAIHelp. Please obtain certified forms from the ${stateName} Department of Revenue.`,
           isOfficialForm: false,
           status: "not_supported",
@@ -107,4 +149,8 @@ export class DefaultStateDocumentProvider implements IStateReturnDocumentProvide
       generatedAt: now,
     };
   }
+}
+
+export function getStateDocumentProvider(stateCode: string): IStateReturnDocumentProvider {
+  return new DefaultStateDocumentProvider(stateCode.toUpperCase().trim());
 }

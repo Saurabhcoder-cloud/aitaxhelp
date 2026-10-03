@@ -173,7 +173,7 @@ describe("Phase 7: State Tax Architecture & Federal/State Separation", () => {
     });
 
     it("marks income-tax states lacking certified engines as NOT_SUPPORTED without guessing", () => {
-      const unsupportedStates = ["CA", "NY", "IL", "OH", "MA"];
+      const unsupportedStates = ["NY", "IL", "OH", "MA"];
       for (const code of unsupportedStates) {
         const info = getStateSupportInfo(code);
         expect(info?.hasIndividualIncomeTax).toBe(true);
@@ -378,13 +378,13 @@ describe("Phase 7: State Tax Architecture & Federal/State Separation", () => {
       expect(warn).toBeDefined();
     });
 
-    it("returns NOT_SUPPORTED for states without certified statutory engines (e.g. California)", async () => {
-      const session = await setupStandardCalculatedSession(USER_A_TOKEN, "CA");
+    it("returns NOT_SUPPORTED for states without certified statutory engines (e.g. New York)", async () => {
+      const session = await setupStandardCalculatedSession(USER_A_TOKEN, "NY");
       const readiness = evaluateStateReadiness(session);
 
       expect(readiness.status).toBe("NOT_SUPPORTED");
       expect(readiness.isReady).toBe(false);
-      expect(readiness.stateCode).toBe("CA");
+      expect(readiness.stateCode).toBe("NY");
 
       const err = readiness.blockingErrors.find((e) => e.code === "STATE_NOT_SUPPORTED");
       expect(err).toBeDefined();
@@ -538,7 +538,7 @@ describe("Phase 7: State Tax Architecture & Federal/State Separation", () => {
     });
 
     it("POST /state-tax/calculate rejects unsupported states with 422 STATE_NOT_SUPPORTED", async () => {
-      await setupStandardCalculatedSession(USER_A_TOKEN, "CA");
+      await setupStandardCalculatedSession(USER_A_TOKEN, "NY");
 
       const req = createMockRequest("http://localhost:3000/api/v1/tax/preparation/session/state-tax/calculate", {
         method: "POST",

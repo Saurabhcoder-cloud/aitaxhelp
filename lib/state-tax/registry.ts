@@ -1,9 +1,9 @@
 /**
- * State Support Registry — Phase 7
+ * State Support Registry — Phase 11
  *
  * Deterministically catalogs all 50 US States + District of Columbia.
  * Identifies states with no individual personal income tax, supported engines,
- * active tax years, and statutory filing requirements.
+ * active tax years, statutory filing requirements, and support tiers.
  *
  * ARCHITECTURAL INVARIANT:
  * For unsupported states, deterministically returns NOT_SUPPORTED.
@@ -11,21 +11,34 @@
  */
 
 import { TaxYear } from "@/types/tax";
-import { IStateTaxEngine, NoIncomeTaxStateEngine, UnsupportedStateEngine } from "./engine";
+import { IStateTaxEngine, NoIncomeTaxStateEngine, UnsupportedStateEngine, CaliforniaTaxEngine } from "./engine";
+import { StateSupportTier } from "./types";
 
 export type StateSupportStatus =
   | "SUPPORTED"
   | "NO_STATE_INCOME_TAX"
   | "NOT_SUPPORTED";
 
+export interface StateSupportDetails {
+  filingStatusSupport: boolean;
+  residentSupport: boolean;
+  nonresidentSupport: boolean;
+  partYearSupport: boolean;
+  multiStateSupport: boolean;
+  stateReturnDocumentSupport: boolean;
+  efileReadiness: "READY" | "IN_DEVELOPMENT" | "OFFLINE";
+}
+
 export interface StateSupportInfo {
   stateCode: string;
   stateName: string;
   hasIndividualIncomeTax: boolean;
   supportStatus: StateSupportStatus;
+  supportTier?: StateSupportTier;
   supportedYears: TaxYear[];
   activeEngineVersion: string | null;
   filingRequirementSummary: string;
+  supportDetails?: StateSupportDetails;
 }
 
 // 9 States with no broad individual wage income tax
@@ -87,17 +100,30 @@ const INCOME_TAX_STATES: Record<string, string> = {
   WV: "West Virginia",
 };
 
-// Dynamic engine registry allowing future plug-in of certified state engines (e.g. CA, NY)
+// Dynamic engine registry
 const registeredEngines = new Map<string, IStateTaxEngine>();
 
-// Initialize default engines
-for (const [code, name] of Object.entries(NO_INCOME_TAX_STATES)) {
-  registeredEngines.set(code, new NoIncomeTaxStateEngine(code, name));
+function initDefaultEngines() {
+  registeredEngines.clear();
+  for (const [code, name] of Object.entries(NO_INCOME_TAX_STATES)) {
+    registeredEngines.set(code, new NoIncomeTaxStateEngine(code, name));
+  }
+  // Initialize verified California statutory engine
+  registeredEngines.set("CA", new CaliforniaTaxEngine());
+}
+
+initDefaultEngines();
+
+/**
+ * Resets the engine registry to default baseline (useful for test isolation).
+ */
+export function resetDefaultEnginesForTesting(): void {
+  initDefaultEngines();
 }
 
 /**
  * Registers an active certified state tax engine.
- * Allows adding California, New York, etc. without modifying federal logic.
+ * Allows adding certified state engines without modifying federal logic.
  */
 export function registerStateEngine(engine: IStateTaxEngine): void {
   registeredEngines.set(engine.getSupportedStateCode().toUpperCase(), engine);
@@ -142,22 +168,42 @@ export function getStateSupportInfo(stateCode: string): StateSupportInfo | null 
       stateName,
       hasIndividualIncomeTax: false,
       supportStatus: "NO_STATE_INCOME_TAX",
+      supportTier: "NO_INCOME_TAX",
       supportedYears: [2025, 2026],
       activeEngineVersion: engine?.engineVersion || "1.0.0-statutory-no-tax",
       filingRequirementSummary: `${stateName} does not levy personal income taxes on wage earnings. No state income tax return is required.`,
+      supportDetails: {
+        filingStatusSupport: true,
+        residentSupport: true,
+        nonresidentSupport: true,
+        partYearSupport: true,
+        multiStateSupport: true,
+        stateReturnDocumentSupport: true,
+        efileReadiness: "READY",
+      },
     };
   }
 
-  // State has income tax
+  // State has income tax and active engine is registered
   if (engine && !(engine instanceof UnsupportedStateEngine)) {
     return {
       stateCode: code,
       stateName,
       hasIndividualIncomeTax: true,
       supportStatus: "SUPPORTED",
+      supportTier: "SUPPORTED",
       supportedYears: engine.getSupportedTaxYears(),
       activeEngineVersion: engine.engineVersion,
       filingRequirementSummary: `Certified ${stateName} statutory income tax engine is available.`,
+      supportDetails: {
+        filingStatusSupport: true,
+        residentSupport: true,
+        nonresidentSupport: true,
+        partYearSupport: true,
+        multiStateSupport: true,
+        stateReturnDocumentSupport: true,
+        efileReadiness: "READY",
+      },
     };
   }
 
@@ -166,9 +212,19 @@ export function getStateSupportInfo(stateCode: string): StateSupportInfo | null 
     stateName,
     hasIndividualIncomeTax: true,
     supportStatus: "NOT_SUPPORTED",
+    supportTier: "NOT_SUPPORTED",
     supportedYears: [],
     activeEngineVersion: null,
     filingRequirementSummary: `${stateName} imposes individual income tax, but a certified statutory calculation engine is not currently implemented.`,
+    supportDetails: {
+      filingStatusSupport: false,
+      residentSupport: false,
+      nonresidentSupport: false,
+      partYearSupport: false,
+      multiStateSupport: false,
+      stateReturnDocumentSupport: false,
+      efileReadiness: "OFFLINE",
+    },
   };
 }
 

@@ -1,5 +1,5 @@
 /**
- * State Tax Summary Generator — Phase 7
+ * State Tax Summary Generator — Phase 11
  *
  * Deterministically generates a clean, standalone State Tax Situation Summary.
  * Clearly separates state figures from federal tax figures.
@@ -18,7 +18,7 @@ import {
   StateCalculationResult,
 } from "./types";
 import { getStateSupportInfo, getStateEngine, StateSupportStatus } from "./registry";
-import { buildStateBridgeData } from "./federal-bridge";
+import { buildStateBridgeData, StateBridgeOptions } from "./federal-bridge";
 import { evaluateStateReadiness } from "./readiness";
 
 export interface StateTaxSummary {
@@ -40,9 +40,19 @@ export interface StateTaxSummary {
     totalCreditsCents: number;
     netTaxLiabilityCents: number;
     stateWithholdingCents: number;
+    estimatedPaymentsCents?: number;
     totalPaymentsCents: number;
     refundOrBalanceType: StateRefundOrBalanceType;
     refundOrBalanceCents: number;
+    breakdown?: {
+      additionsCents: number;
+      subtractionsCents: number;
+      deductionUsedCents: number;
+      exemptionsCents: number;
+      calEitcCents?: number;
+      youngChildCreditCents?: number;
+      mentalHealthServicesTaxCents?: number;
+    };
   };
   readiness: {
     status: StateReadinessStatus;
@@ -64,9 +74,7 @@ export const STATE_TAX_SUMMARY_DISCLAIMER =
 export function buildStateTaxSummary(
   session: TaxPreparationSession,
   providedFederalReturn?: FederalReturn,
-  options?: {
-    stateCodeOverride?: string;
-  }
+  options?: StateBridgeOptions
 ): StateTaxSummary {
   const federalReturn = providedFederalReturn || buildFederalReturn(session);
   const bridge = buildStateBridgeData(session, federalReturn, options);
@@ -103,9 +111,11 @@ export function buildStateTaxSummary(
         totalCreditsCents: 0,
         netTaxLiabilityCents: 0,
         stateWithholdingCents: calcResult.totalWithholdingCents,
-        totalPaymentsCents: calcResult.totalWithholdingCents,
+        estimatedPaymentsCents: calcResult.estimatedPaymentsCents || 0,
+        totalPaymentsCents: calcResult.totalWithholdingCents + (calcResult.estimatedPaymentsCents || 0),
         refundOrBalanceType: calcResult.refundOrBalanceType,
         refundOrBalanceCents: calcResult.refundOrBalanceCents,
+        breakdown: calcResult.breakdown,
       },
       readiness: {
         status: readiness.status,
@@ -119,10 +129,15 @@ export function buildStateTaxSummary(
     };
   }
 
-  // Case 2: Supported state with certified engine
+  // Case 2: Supported state with certified engine (e.g. CA)
   if (supportStatus === "SUPPORTED") {
     const engine = getStateEngine(stateCode);
     const calcResult: StateCalculationResult = engine.calculateStateTax(bridge.calculationInput);
+
+    const totalPayments =
+      calcResult.totalWithholdingCents +
+      (calcResult.estimatedPaymentsCents || 0) +
+      calcResult.refundableCreditsCents;
 
     return {
       stateCode,
@@ -143,9 +158,11 @@ export function buildStateTaxSummary(
         totalCreditsCents: calcResult.nonRefundableCreditsCents + calcResult.refundableCreditsCents,
         netTaxLiabilityCents: calcResult.netStateTaxCents,
         stateWithholdingCents: calcResult.totalWithholdingCents,
-        totalPaymentsCents: calcResult.totalWithholdingCents + calcResult.refundableCreditsCents,
+        estimatedPaymentsCents: calcResult.estimatedPaymentsCents || 0,
+        totalPaymentsCents: totalPayments,
         refundOrBalanceType: calcResult.refundOrBalanceType,
         refundOrBalanceCents: calcResult.refundOrBalanceCents,
+        breakdown: calcResult.breakdown,
       },
       readiness: {
         status: readiness.status,
@@ -179,7 +196,8 @@ export function buildStateTaxSummary(
       totalCreditsCents: 0,
       netTaxLiabilityCents: 0,
       stateWithholdingCents: bridge.financials.stateWithholdingCents,
-      totalPaymentsCents: bridge.financials.stateWithholdingCents,
+      estimatedPaymentsCents: bridge.financials.stateEstimatedPaymentsCents,
+      totalPaymentsCents: bridge.financials.stateWithholdingCents + bridge.financials.stateEstimatedPaymentsCents,
       refundOrBalanceType: "not_calculated",
       refundOrBalanceCents: 0,
     },

@@ -1,5 +1,5 @@
 /**
- * Federal -> State Data Bridge — Phase 7
+ * Federal -> State Data Bridge — Phase 11
  *
  * Deterministic mapping layer that safely bridges verified FederalReturn data
  * into state-engine inputs without executing state tax calculations.
@@ -18,6 +18,21 @@ import {
   StateIncomeAllocationRecord,
 } from "./types";
 
+export interface StateBridgeOptions {
+  residencyType?: StateResidencyType;
+  multiStateRecords?: StateIncomeAllocationRecord[];
+  stateWithholdingCents?: number;
+  stateEstimatedPaymentsCents?: number;
+  stateCodeOverride?: string;
+  nonresidentIncomeAllocationPercentage?: number;
+  priorStateCode?: string;
+  moveDate?: string;
+  stateAdditionsCents?: number;
+  stateSubtractionsCents?: number;
+  hasUnder6Child?: boolean;
+  customStateInputs?: Record<string, unknown>;
+}
+
 export interface StateBridgeData {
   stateCode: string;
   taxYear: FederalReturn["metadata"]["taxYear"];
@@ -29,6 +44,9 @@ export interface StateBridgeData {
     stateOfResidence: string;
     filingStatus: FederalReturn["filingStatus"]["status"];
     filingStatusLabel: string;
+    residencyType: StateResidencyType;
+    priorStateCode?: string;
+    moveDate?: string;
   };
   spouse: {
     hasSpouse: boolean;
@@ -48,6 +66,7 @@ export interface StateBridgeData {
     stateAndLocalTaxesPaidCents: number;
     federalTotalWithholdingCents: number;
     stateWithholdingCents: number;
+    stateEstimatedPaymentsCents: number;
   };
   calculationInput: StateCalculationInput;
 }
@@ -59,12 +78,7 @@ export interface StateBridgeData {
 export function mapFederalReturnToStateInput(
   session: TaxPreparationSession,
   providedFederalReturn?: FederalReturn,
-  options?: {
-    residencyType?: StateResidencyType;
-    multiStateRecords?: StateIncomeAllocationRecord[];
-    stateWithholdingCents?: number;
-    stateCodeOverride?: string;
-  }
+  options?: StateBridgeOptions
 ): StateCalculationInput {
   const federalReturn = providedFederalReturn || buildFederalReturn(session);
 
@@ -109,7 +123,15 @@ export function mapFederalReturnToStateInput(
     qualifyingChildrenCount: federalReturn.credits.qualifyingChildrenCount,
     qualifyingDependentsCount: federalReturn.credits.otherDependentsCount,
     stateWithholdingCents,
+    stateEstimatedPaymentsCents: options?.stateEstimatedPaymentsCents || 0,
+    nonresidentIncomeAllocationPercentage: options?.nonresidentIncomeAllocationPercentage,
+    priorStateCode: options?.priorStateCode,
+    moveDate: options?.moveDate,
+    stateAdditionsCents: options?.stateAdditionsCents,
+    stateSubtractionsCents: options?.stateSubtractionsCents,
+    hasUnder6Child: options?.hasUnder6Child,
     multiStateRecords: options?.multiStateRecords,
+    customStateInputs: options?.customStateInputs,
   };
 }
 
@@ -119,12 +141,7 @@ export function mapFederalReturnToStateInput(
 export function buildStateBridgeData(
   session: TaxPreparationSession,
   providedFederalReturn?: FederalReturn,
-  options?: {
-    residencyType?: StateResidencyType;
-    multiStateRecords?: StateIncomeAllocationRecord[];
-    stateWithholdingCents?: number;
-    stateCodeOverride?: string;
-  }
+  options?: StateBridgeOptions
 ): StateBridgeData {
   const federalReturn = providedFederalReturn || buildFederalReturn(session);
   const calculationInput = mapFederalReturnToStateInput(session, federalReturn, options);
@@ -145,6 +162,9 @@ export function buildStateBridgeData(
       stateOfResidence: calculationInput.stateCode,
       filingStatus: federalReturn.filingStatus.status,
       filingStatusLabel: federalReturn.filingStatus.label,
+      residencyType: calculationInput.residencyType,
+      priorStateCode: calculationInput.priorStateCode,
+      moveDate: calculationInput.moveDate,
     },
     spouse: {
       hasSpouse: federalReturn.spouse.hasSpouse,
@@ -164,6 +184,7 @@ export function buildStateBridgeData(
       stateAndLocalTaxesPaidCents,
       federalTotalWithholdingCents: federalReturn.payments.totalFederalWithholdingCents,
       stateWithholdingCents: calculationInput.stateWithholdingCents,
+      stateEstimatedPaymentsCents: calculationInput.stateEstimatedPaymentsCents || 0,
     },
     calculationInput,
   };

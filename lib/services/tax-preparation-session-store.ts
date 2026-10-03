@@ -36,6 +36,7 @@ import {
 import { executePreparationCalculation } from "@/lib/preparation/calculation";
 import { ImportCalculatorSessionInput } from "@/lib/validations/preparation-session";
 import { invalidateFinalReturnSnapshot } from "@/lib/preparation/final-return-snapshot";
+import { StateTaxReturnStore } from "@/lib/services/state-tax-return-store";
 
 export interface TaxPreparationSession {
   id: string;
@@ -861,6 +862,7 @@ export class TaxPreparationSessionStore {
 
   private static async persist(updated: TaxPreparationSession): Promise<TaxPreparationSession> {
     invalidateFinalReturnSnapshot(updated.id);
+    void StateTaxReturnStore.invalidateStateReturn(updated.id);
     if (SUPABASE_CONFIG.isConfigured()) {
       const saved = await this.updateDatabase(updated);
       return fromRow(saved);

@@ -1,5 +1,5 @@
 /**
- * State Tax Engine Interface & Baseline Engines — Phase 7
+ * State Tax Engine Interface & Baseline Engines — Phase 11
  *
  * Provides an extensible, deterministic interface for state income tax computation.
  * Supports adding individual state engines (CA, NY, TX, FL, etc.) without altering
@@ -19,6 +19,7 @@ import {
   StateReadiness,
   StateValidationError,
   StateValidationCheck,
+  StateReturn,
 } from "./types";
 
 export interface IStateTaxEngine {
@@ -33,6 +34,18 @@ export interface IStateTaxEngine {
   calculateStateTax(input: StateCalculationInput): StateCalculationResult;
   validateStateReturn(input: StateCalculationInput): StateValidationError[];
   getStateReadiness(input: StateCalculationInput): StateReadiness;
+  getRulesMetadata?(taxYear: TaxYear): Record<string, unknown>;
+  buildReturn?(
+    input: StateCalculationInput,
+    sessionMetadata: {
+      returnId: string;
+      sessionId: string;
+      userId: string;
+      taxpayerName: string;
+      spouseName?: string;
+      hasSpouse?: boolean;
+    }
+  ): StateReturn;
 }
 
 // =============================================================================
@@ -57,8 +70,23 @@ export class NoIncomeTaxStateEngine implements IStateTaxEngine {
     return [2025, 2026];
   }
 
+  public getRulesMetadata(taxYear: TaxYear): Record<string, unknown> {
+    return {
+      stateCode: this.stateCode,
+      stateName: this.stateName,
+      taxYear,
+      engineVersion: this.engineVersion,
+      rulesVersion: this.rulesVersion,
+      hasIndividualIncomeTax: false,
+      filingRequirement: "No state income tax return required.",
+    };
+  }
+
   public calculateStateTax(input: StateCalculationInput): StateCalculationResult {
     const totalWithholding = input.stateWithholdingCents || 0;
+    const estimatedPayments = input.stateEstimatedPaymentsCents || 0;
+    const totalPayments = totalWithholding + estimatedPayments;
+
     return {
       stateCode: this.stateCode,
       taxYear: input.taxYear,
@@ -71,8 +99,9 @@ export class NoIncomeTaxStateEngine implements IStateTaxEngine {
       netStateTaxCents: 0,
       refundableCreditsCents: 0,
       totalWithholdingCents: totalWithholding,
-      refundOrBalanceCents: totalWithholding, // If state withholding occurred, full refund is expected
-      refundOrBalanceType: totalWithholding > 0 ? "refund" : "zero",
+      estimatedPaymentsCents: estimatedPayments,
+      refundOrBalanceCents: totalPayments, // If state withholding occurred, full refund is expected
+      refundOrBalanceType: totalPayments > 0 ? "refund" : "zero",
       effectiveTaxRate: 0,
       marginalTaxBracket: 0,
       breakdown: {
@@ -124,6 +153,114 @@ export class NoIncomeTaxStateEngine implements IStateTaxEngine {
       notice: `${this.stateName} has no state individual income tax. You are not required to file a state income tax return for Tax Year ${input.taxYear}.`,
     };
   }
+
+  public buildReturn(
+    input: StateCalculationInput,
+    sessionMetadata: {
+      returnId: string;
+      sessionId: string;
+      userId: string;
+      taxpayerName: string;
+      spouseName?: string;
+      hasSpouse?: boolean;
+    }
+  ): StateReturn {
+    const calc = this.calculateStateTax(input);
+    const readiness = this.getStateReadiness(input);
+    const now = new Date().toISOString();
+
+    return {
+      returnId: sessionMetadata.returnId,
+      sessionId: sessionMetadata.sessionId,
+      userId: sessionMetadata.userId,
+      metadata: {
+        stateCode: this.stateCode,
+        stateName: this.stateName,
+        taxYear: input.taxYear,
+        engineVersion: this.engineVersion,
+        rulesVersion: this.rulesVersion,
+        hasIncomeTax: false,
+        isEngineSupported: true,
+        federalReturnVersion: "v2025_v1",
+        generatedAt: now,
+        supportTier: "NO_INCOME_TAX",
+      },
+      taxpayer: {
+        fullName: sessionMetadata.taxpayerName,
+        stateOfResidence: this.stateCode,
+        residencyType: input.residencyType,
+      },
+      spouse: {
+        hasSpouse: Boolean(sessionMetadata.hasSpouse),
+        fullName: sessionMetadata.spouseName,
+        stateOfResidence: sessionMetadata.hasSpouse ? this.stateCode : undefined,
+      },
+      filingStatus: {
+        stateStatus: input.filingStatus,
+        label: input.filingStatus.replace(/_/g, " ").toUpperCase(),
+        federalStatus: input.filingStatus,
+        isConformingWithFederal: true,
+      },
+      income: {
+        federalAgiCents: input.federalAgiCents,
+        stateW2WagesCents: input.w2WagesCents,
+        state1099GrossCents: input.gross1099IncomeCents,
+        stateBusinessProfitCents: input.selfEmploymentProfitCents,
+        stateOtherIncomeCents: 0,
+        totalStateGrossIncomeCents: 0,
+        allocationPercentage: 100,
+        multiStateRecords: [],
+        isMultiStateReturn: false,
+      },
+      adjustments: {
+        totalAdditionsCents: 0,
+        totalSubtractionsCents: 0,
+        netAdjustmentsCents: 0,
+        items: [],
+        stateAdjustedGrossIncomeCents: 0,
+      },
+      deductions: {
+        deductionType: "none",
+        stateStandardDeductionCents: 0,
+        stateItemizedDeductionCents: 0,
+        deductionUsedCents: 0,
+        stateExemptionsCents: 0,
+        stateTaxableIncomeCents: 0,
+      },
+      credits: {
+        nonRefundableCreditsCents: 0,
+        refundableCreditsCents: 0,
+        totalCreditsCents: 0,
+        items: [],
+      },
+      liability: {
+        stateTaxableIncomeCents: 0,
+        grossStateTaxCents: 0,
+        netStateTaxCents: 0,
+        effectiveTaxRate: 0,
+        marginalTaxBracket: 0,
+      },
+      withholding: {
+        w2StateWithholdingCents: calc.totalWithholdingCents,
+        form1099StateWithholdingCents: 0,
+        totalStateWithholdingCents: calc.totalWithholdingCents,
+        records: [],
+      },
+      payments: {
+        totalWithholdingCents: calc.totalWithholdingCents,
+        estimatedPaymentsCents: calc.estimatedPaymentsCents || 0,
+        refundableCreditsCents: 0,
+        totalPaymentsAndCreditsCents: calc.totalWithholdingCents + (calc.estimatedPaymentsCents || 0),
+      },
+      refundOrBalance: {
+        type: calc.refundOrBalanceType,
+        amountCents: calc.refundOrBalanceCents,
+        estimatedRefundCents: calc.refundOrBalanceCents,
+        estimatedAmountOwedCents: 0,
+      },
+      readiness,
+    };
+  }
 }
 
 // =============================================================================
@@ -146,6 +283,16 @@ export class UnsupportedStateEngine implements IStateTaxEngine {
 
   public getSupportedTaxYears(): TaxYear[] {
     return [];
+  }
+
+  public getRulesMetadata(_taxYear: TaxYear): Record<string, unknown> {
+    return {
+      stateCode: this.stateCode,
+      stateName: this.stateName,
+      hasIndividualIncomeTax: true,
+      supportStatus: "NOT_SUPPORTED",
+      reason: "No verified statutory rule engine implemented.",
+    };
   }
 
   public calculateStateTax(input: StateCalculationInput): StateCalculationResult {
@@ -208,4 +355,17 @@ export class UnsupportedStateEngine implements IStateTaxEngine {
       notice: `State tax preparation for ${this.stateName} is currently unavailable. TaxAIHelp will never provide guessed or unverified state calculations.`,
     };
   }
+
+  public buildReturn(
+    _input: StateCalculationInput,
+    _sessionMetadata: any
+  ): StateReturn {
+    throw new AppError(
+      `Cannot build state return for ${this.stateName} because the state is not currently supported.`,
+      422,
+      "STATE_NOT_SUPPORTED"
+    );
+  }
 }
+
+export { CaliforniaTaxEngine } from "./engines/california-engine";
