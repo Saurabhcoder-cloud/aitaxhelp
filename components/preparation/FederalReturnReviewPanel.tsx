@@ -25,7 +25,13 @@ import {
   Users,
   DollarSign,
   FileCheck,
+  FileDown,
+  ExternalLink,
 } from "lucide-react";
+import {
+  buildFederalReturnDocumentPackage,
+  OFFICIAL_DOCUMENT_DISCLAIMER,
+} from "@/lib/preparation/federal-return-documents";
 
 interface FederalReturnReviewPanelProps {
   session: TaxPreparationSession;
@@ -43,8 +49,9 @@ export function FederalReturnReviewPanel({
   isSubmitting,
 }: FederalReturnReviewPanelProps) {
   const submitting = isSubmitting || isSaving;
-  // Build the deterministic federal return model
+  // Build the deterministic federal return model and document package
   const federalReturn: FederalReturn = buildFederalReturn(session);
+  const documentPackage = buildFederalReturnDocumentPackage(session);
 
   // Expandable section states
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -57,6 +64,7 @@ export function FederalReturnReviewPanel({
     payments: true,
     reconciliation: true,
     readiness: true,
+    documents: true,
   });
 
   const toggleSection = (section: string) => {
@@ -671,6 +679,177 @@ export function FederalReturnReviewPanel({
                     </Badge>
                   </div>
                 ))}
+              </div>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* SECTION J: Official Federal Tax Return Documents & Export */}
+      <Card className="border-brand-200">
+        <CardHeader
+          className="cursor-pointer hover:bg-surface-50/80 transition-colors py-3.5 px-5 flex flex-row items-center justify-between"
+          onClick={() => toggleSection("documents")}
+        >
+          <div className="flex items-center gap-2.5">
+            <FileDown className="w-4 h-4 text-brand-600" />
+            <CardTitle className="text-base font-semibold">9. Official Federal Return Documents & Export Package</CardTitle>
+            <Badge
+              variant={
+                documentPackage.generationStatus === "ready"
+                  ? "emerald"
+                  : documentPackage.generationStatus === "ready_with_warnings"
+                  ? "amber"
+                  : "amber"
+              }
+              className="text-xs"
+            >
+              {documentPackage.generationStatus === "ready"
+                ? "Ready for Download"
+                : documentPackage.generationStatus === "ready_with_warnings"
+                ? "Ready (Warnings Noted)"
+                : "Export Blocked"}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            {expandedSections.documents ? (
+              <ChevronUp className="w-4 h-4 text-surface-400" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-surface-400" />
+            )}
+          </div>
+        </CardHeader>
+
+        {expandedSections.documents && (
+          <CardContent className="pt-0 px-5 pb-5 text-xs space-y-4">
+            {/* Official Disclaimer Banner */}
+            <div className="p-3.5 rounded-lg border border-amber-200 bg-amber-50/70 text-amber-900 space-y-1.5">
+              <div className="flex items-center gap-2 font-semibold text-xs">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>OFFICIAL TAX PREPARATION & FILING NOTICE</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-amber-800">
+                {OFFICIAL_DOCUMENT_DISCLAIMER}
+              </p>
+              <p className="text-[10px] text-amber-700">
+                To file with the IRS: Print, sign, and mail these documents with Form 1040 instructions, or deliver them to your certified CPA or tax professional. TaxAIHelp does NOT transmit tax returns directly to the IRS in this version.
+              </p>
+            </div>
+
+            {/* Blocked state if issues exist */}
+            {documentPackage.isBlocked && (
+              <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-red-900 space-y-2">
+                <div className="flex items-center gap-2 font-semibold">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                  <span>Document Export Temporarily Blocked</span>
+                </div>
+                <p className="text-[11px] text-red-800">
+                  Document downloads are strictly gated until all required tax information is provided and mathematical calculations reconcile:
+                </p>
+                <ul className="list-disc list-inside space-y-0.5 text-[11px] text-red-700">
+                  {documentPackage.blockingIssues.map((issue, idx) => (
+                    <li key={idx}>{issue}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Downloadable Documents Grid */}
+            <div className="space-y-2">
+              <p className="font-semibold text-surface-800 text-xs">
+                Generated PDF Preparation Documents ({documentPackage.documents.length})
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {documentPackage.documents.map((doc) => {
+                  return (
+                    <div
+                      key={doc.documentType}
+                      className="flex flex-col justify-between p-3.5 rounded-lg border border-surface-200 bg-surface-50/60 hover:bg-surface-50 transition-colors space-y-3"
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-start justify-between gap-1">
+                          <span className="font-semibold text-surface-900 text-xs leading-snug">
+                            {doc.title}
+                          </span>
+                          <span className="text-[10px] font-medium text-surface-500 uppercase shrink-0">
+                            ~{doc.estimatedPageCount} {doc.estimatedPageCount === 1 ? "page" : "pages"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-surface-600 font-mono">
+                          {doc.filename}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2 border-t border-surface-200/80">
+                        <a
+                          href={documentPackage.isBlocked ? undefined : doc.downloadUrl}
+                          download={documentPackage.isBlocked ? undefined : doc.filename}
+                          className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md shadow-sm transition-colors flex-1 ${
+                            documentPackage.isBlocked
+                              ? "bg-surface-200 text-surface-400 cursor-not-allowed pointer-events-none"
+                              : "bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800"
+                          }`}
+                        >
+                          <FileDown className="w-3.5 h-3.5" />
+                          <span>Download PDF</span>
+                        </a>
+
+                        <a
+                          href={documentPackage.isBlocked ? undefined : `${doc.downloadUrl}&inline=true`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open preview in browser"
+                          className={`inline-flex items-center justify-center p-1.5 text-xs font-medium rounded-md border border-surface-300 transition-colors ${
+                            documentPackage.isBlocked
+                              ? "text-surface-300 border-surface-200 cursor-not-allowed pointer-events-none"
+                              : "text-surface-700 bg-white hover:bg-surface-100"
+                          }`}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* IRS Accompanying Schedules Evaluation Grid */}
+            <div className="space-y-2 pt-3 border-t border-surface-200">
+              <div className="flex items-center justify-between">
+                <p className="font-semibold text-surface-800 text-xs">
+                  Accompanying IRS Federal Schedules Status
+                </p>
+                <span className="text-[10px] text-surface-500">
+                  {documentPackage.schedules.filter((s) => s.status === "ready").length} Active / {documentPackage.schedules.length} Monitored
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                {documentPackage.schedules.map((schedule) => {
+                  const isReady = schedule.status === "ready";
+                  const isNA = schedule.status === "not_applicable";
+                  return (
+                    <div
+                      key={schedule.schedule}
+                      className="p-2.5 rounded border border-surface-200 bg-white space-y-1"
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-medium text-surface-900 text-[11px] truncate" title={schedule.label}>
+                          {schedule.label.split("—")[0].trim()}
+                        </span>
+                        <Badge
+                          variant={isReady ? "emerald" : isNA ? "neutral" : "amber"}
+                          className="text-[9px] px-1.5 py-0 uppercase"
+                        >
+                          {isReady ? "Ready" : isNA ? "N/A" : "Unsupported"}
+                        </Badge>
+                      </div>
+                      <p className="text-[10px] text-surface-500 line-clamp-2 leading-tight" title={schedule.statusReason}>
+                        {schedule.statusReason}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </CardContent>
