@@ -27,11 +27,27 @@ import {
   FileCheck,
   FileDown,
   ExternalLink,
+  Lock,
+  ShieldAlert,
+  Send,
+  Clock,
+  UserCheck,
 } from "lucide-react";
 import {
   buildFederalReturnDocumentPackage,
   OFFICIAL_DOCUMENT_DISCLAIMER,
 } from "@/lib/preparation/federal-return-documents";
+import {
+  evaluateEfileReadiness,
+  EfileReadinessEvaluation,
+} from "@/lib/preparation/efile-readiness";
+import {
+  getFinalReturnSnapshot,
+  FinalReturnSnapshot,
+} from "@/lib/preparation/final-return-snapshot";
+import { StateTaxReviewPanel } from "@/components/preparation/StateTaxReviewPanel";
+import { ProfessionalReviewModal } from "@/components/preparation/ProfessionalReviewModal";
+import { ProfessionalReviewCase } from "@/lib/professional/types";
 
 interface FederalReturnReviewPanelProps {
   session: TaxPreparationSession;
@@ -52,6 +68,84 @@ export function FederalReturnReviewPanel({
   // Build the deterministic federal return model and document package
   const federalReturn: FederalReturn = buildFederalReturn(session);
   const documentPackage = buildFederalReturnDocumentPackage(session);
+  const efileEvaluation: EfileReadinessEvaluation = evaluateEfileReadiness(session, federalReturn);
+
+  // Snapshot freeze state
+  const [frozenSnapshot, setFrozenSnapshot] = useState<FinalReturnSnapshot | null>(() =>
+    getFinalReturnSnapshot(session.id)
+  );
+  const [isFreezing, setIsFreezing] = useState(false);
+  const [freezeError, setFreezeError] = useState<string | null>(null);
+
+  const handleFreezeSnapshot = async () => {
+    try {
+      setIsFreezing(true);
+      setFreezeError(null);
+      const res = await fetch("/api/v1/tax/preparation/session/federal-return/efile/freeze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json?.error?.message || "Failed to freeze return snapshot.");
+      }
+      setFrozenSnapshot(json.data);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to freeze return snapshot.";
+      setFreezeError(msg);
+    } finally {
+      setIsFreezing(false);
+    }
+  };
+
+  // Professional Review Case State
+  const [isProModalOpen, setIsProModalOpen] = useState(false);
+  const [proReviewCase, setProReviewCase] = useState<ProfessionalReviewCase | null>(null);
+  const [isResubmittingPro, setIsResubmittingPro] = useState(false);
+  const [resubmitMessage, setResubmitMessage] = useState<string | null>(null);
+
+  const fetchProReviewCase = React.useCallback(async () => {
+    if (!session?.id) return;
+    try {
+      const res = await fetch(
+        `/api/v1/tax/preparation/session/professional-review?sessionId=${encodeURIComponent(session.id)}`
+      );
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          setProReviewCase(json.data);
+        }
+      }
+    } catch (_e) {}
+  }, [session?.id]);
+
+  React.useEffect(() => {
+    fetchProReviewCase();
+  }, [fetchProReviewCase]);
+
+  const handleResubmitPro = async () => {
+    if (!proReviewCase) return;
+    try {
+      setIsResubmittingPro(true);
+      setResubmitMessage(null);
+      const res = await fetch(
+        `/api/v1/tax/preparation/session/professional-review/${proReviewCase.id}/resubmit`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ taxpayerNotes: "Taxpayer updated preparation details." }),
+        }
+      );
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setProReviewCase(json.data);
+        setResubmitMessage("Updated tax return resubmitted to assigned professional.");
+      }
+    } catch (_e) {
+    } finally {
+      setIsResubmittingPro(false);
+    }
+  };
 
   // Expandable section states
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -65,6 +159,7 @@ export function FederalReturnReviewPanel({
     reconciliation: true,
     readiness: true,
     documents: true,
+    efile: true,
   });
 
   const toggleSection = (section: string) => {
@@ -855,6 +950,299 @@ export function FederalReturnReviewPanel({
           </CardContent>
         )}
       </Card>
+
+      {/* SECTION K: Federal Filing Readiness & IRS E-File Foundation */}
+      <Card className="border-brand-200">
+        <CardHeader
+          className="cursor-pointer hover:bg-surface-50/80 transition-colors py-3.5 px-5 flex flex-row items-center justify-between"
+          onClick={() => toggleSection("efile")}
+        >
+          <div className="flex items-center gap-2.5">
+            <Send className="w-4 h-4 text-brand-600" />
+            <CardTitle className="text-base font-semibold">10. Federal Filing Readiness & IRS E-File Foundation</CardTitle>
+            <Badge
+              variant={
+                efileEvaluation.status === "READY"
+                  ? "emerald"
+                  : efileEvaluation.status === "REQUIRES_REVIEW"
+                  ? "amber"
+                  : "amber"
+              }
+              className="text-xs"
+            >
+              {efileEvaluation.status === "READY"
+                ? "Ready for Filing Preparation"
+                : efileEvaluation.status === "REQUIRES_REVIEW"
+                ? "Review Required"
+                : efileEvaluation.status === "NOT_SUPPORTED"
+                ? "Unsupported Forms"
+                : "Filing Blocked"}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            {expandedSections.efile ? (
+              <ChevronUp className="w-4 h-4 text-surface-400" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-surface-400" />
+            )}
+          </div>
+        </CardHeader>
+
+        {expandedSections.efile && (
+          <CardContent className="pt-0 px-5 pb-5 text-xs space-y-4">
+            {/* Transmission Status & Disclaimer Banner */}
+            <div className="p-3.5 rounded-lg border border-blue-200 bg-blue-50/60 text-blue-900 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-semibold text-xs">
+                  <ShieldAlert className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>IRS ELECTRONIC FILING NOTICE & TRANSMISSION STATUS</span>
+                </div>
+                <Badge variant="neutral" className="text-[10px] uppercase font-mono">
+                  Transmission Offline
+                </Badge>
+              </div>
+              <p className="text-[11px] leading-relaxed text-blue-800">
+                TaxAIHelp prepares and validates federal tax return data under IRS Modernized e-File (MeF) schemas. Direct electronic transmission to the IRS is currently disconnected in this environment. To file your return, download your official Form 1040 package from Section 9, print, sign, and mail it to the IRS, or provide the CPA review package to an authorized e-file preparer.
+              </p>
+            </div>
+
+            {/* Blocking errors banner if present */}
+            {efileEvaluation.blockingErrors.length > 0 && (
+              <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-red-900 space-y-2">
+                <div className="flex items-center gap-2 font-semibold">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                  <span>Filing Blocked ({efileEvaluation.blockingErrors.length} Issue(s))</span>
+                </div>
+                <div className="space-y-1 text-[11px]">
+                  {efileEvaluation.blockingErrors.map((err, idx) => (
+                    <div key={idx} className="flex flex-col sm:flex-row sm:items-baseline justify-between border-b border-red-100 pb-1">
+                      <span className="font-medium text-red-800">• {err.message}</span>
+                      <span className="text-red-600 text-[10px] italic">{err.action}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Structural MeF Checks Checklist */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="font-semibold text-surface-800 text-xs">
+                  IRS Modernized e-File (MeF) Structural Verifications
+                </p>
+                <span className="text-[10px] text-surface-500 font-medium">
+                  {efileEvaluation.summary.passedChecks} of {efileEvaluation.summary.totalChecks} Checks Passed
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {efileEvaluation.checks.map((chk) => (
+                  <div
+                    key={chk.id}
+                    className="flex items-center justify-between p-2 rounded border border-surface-200 bg-surface-50/50 text-[11px]"
+                  >
+                    <div className="flex items-center gap-2 truncate pr-2">
+                      {chk.passed ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                      )}
+                      <span className="font-medium text-surface-800 truncate">{chk.name}</span>
+                    </div>
+                    <span className={chk.passed ? "text-emerald-700 font-semibold shrink-0" : "text-red-700 font-semibold shrink-0"}>
+                      {chk.passed ? "Verified" : "Action Needed"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Final Return Snapshot & Freeze Card */}
+            <div className="p-4 rounded-lg border border-surface-200 bg-surface-50/80 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-brand-600" />
+                    <span className="font-semibold text-surface-900 text-xs">
+                      Final Return Snapshot & Anti-Tampering Integrity
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-surface-600">
+                    {frozenSnapshot
+                      ? "Your final federal return is frozen and cryptographically signed. Values cannot be altered."
+                      : "Create an immutable, cryptographically hashed snapshot of your verified return before filing."}
+                  </p>
+                </div>
+
+                {!frozenSnapshot && (
+                  <Button
+                    onClick={handleFreezeSnapshot}
+                    disabled={!efileEvaluation.isReady || isFreezing || submitting}
+                    size="sm"
+                    className="bg-brand-600 hover:bg-brand-700 text-white text-xs h-8 shrink-0"
+                  >
+                    {isFreezing ? "Freezing..." : "Prepare for E-File (Freeze Snapshot)"}
+                  </Button>
+                )}
+              </div>
+
+              {freezeError && (
+                <p className="text-[11px] text-red-600 font-medium">{freezeError}</p>
+              )}
+
+              {frozenSnapshot && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-surface-200/80 text-[10px]">
+                  <div className="p-2 rounded bg-white border border-surface-200 space-y-0.5">
+                    <span className="text-surface-500 uppercase tracking-wider text-[9px]">Snapshot ID</span>
+                    <p className="font-mono text-surface-800 truncate" title={frozenSnapshot.snapshotId}>
+                      {frozenSnapshot.snapshotId}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded bg-white border border-surface-200 space-y-0.5">
+                    <span className="text-surface-500 uppercase tracking-wider text-[9px]">SHA-256 Checksum</span>
+                    <p className="font-mono text-emerald-700 truncate" title={frozenSnapshot.checksum}>
+                      {frozenSnapshot.checksum.slice(0, 16)}...
+                    </p>
+                  </div>
+                  <div className="p-2 rounded bg-white border border-surface-200 space-y-0.5">
+                    <span className="text-surface-500 uppercase tracking-wider text-[9px]">Frozen Timestamp</span>
+                    <p className="font-mono text-surface-800">
+                      {new Date(frozenSnapshot.frozenAt).toLocaleDateString()} {new Date(frozenSnapshot.frozenAt).toLocaleTimeString()}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* SECTION 11: State Tax Architecture & Federal/State Separation */}
+      <StateTaxReviewPanel
+        stateCode={federalReturn.taxpayer.stateOfResidence || session.profileSnapshot?.stateOfResidence}
+        taxYear={federalReturn.metadata.taxYear}
+      />
+
+      {/* SECTION 12: CPA / EA Professional Review Workflow */}
+      <Card className="border-purple-200 bg-gradient-to-br from-purple-50/40 via-white to-surface-50">
+        <CardHeader className="py-4 px-5 border-b border-purple-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-purple-600" />
+              <CardTitle className="text-base font-semibold text-surface-900">
+                12. CPA / Enrolled Agent Professional Review
+              </CardTitle>
+            </div>
+            {proReviewCase && (
+              <Badge variant="outline" className="border-purple-300 text-purple-700 bg-purple-50 font-semibold">
+                Status: {proReviewCase.status.replace("_", " ")}
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="p-5 space-y-4 text-xs">
+          {!proReviewCase ? (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1 max-w-xl">
+                <p className="font-semibold text-surface-900 text-sm">
+                  Want an expert review before completing your return?
+                </p>
+                <p className="text-surface-600 leading-relaxed">
+                  Have a certified CPA or Enrolled Agent examine your numbers, credits, deductions, and e-file readiness.
+                  Your preparation remains 100% under your control.
+                </p>
+                <p className="text-[11px] text-surface-500 italic">
+                  Advisory examination only. Does not constitute IRS submission or external filing guarantee.
+                </p>
+              </div>
+              <Button
+                onClick={() => setIsProModalOpen(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white shrink-0 h-10 px-5 text-xs font-semibold"
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Request CPA/EA Review
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="p-3.5 rounded-xl border border-purple-200 bg-purple-50/60 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-purple-700 shrink-0" />
+                    <span className="font-semibold text-purple-900">
+                      Active Review Case: {proReviewCase.id.slice(0, 8)}...
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-purple-700">
+                    Assigned: <strong>{proReviewCase.assignedProfessionalName || "Pending Assignment"}</strong>
+                  </span>
+                </div>
+                <p className="text-purple-800 text-[11px]">
+                  Requested on {new Date(proReviewCase.requestedAt).toLocaleDateString()}.
+                  {proReviewCase.openCommentsCount > 0
+                    ? ` ${proReviewCase.openCommentsCount} finding(s) recorded by professional.`
+                    : " Awaiting initial professional review."}
+                </p>
+              </div>
+
+              {/* Changes requested banner */}
+              {proReviewCase.status === "CHANGES_REQUESTED" && (
+                <div className="p-4 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 space-y-3">
+                  <div className="flex items-center gap-2 font-bold text-sm text-amber-800">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>CPA/EA Requested Adjustments to Your Preparation</span>
+                  </div>
+                  {proReviewCase.professionalNotes && (
+                    <div className="p-3 bg-white/80 rounded-lg border border-amber-200 text-xs text-amber-950 font-mono">
+                      {proReviewCase.professionalNotes}
+                    </div>
+                  )}
+                  <p className="text-xs text-amber-800">
+                    Please return to the relevant steps, update your figures, and click below to resubmit for review.
+                  </p>
+                  <Button
+                    onClick={handleResubmitPro}
+                    disabled={isResubmittingPro}
+                    className="bg-amber-600 hover:bg-amber-700 text-white text-xs h-8"
+                  >
+                    <Send className="w-3.5 h-3.5 mr-1.5" />
+                    {isResubmittingPro ? "Resubmitting..." : "Resubmit Updated Preparation"}
+                  </Button>
+                </div>
+              )}
+
+              {resubmitMessage && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{resubmitMessage}</span>
+                </div>
+              )}
+
+              {proReviewCase.status === "REVIEW_COMPLETED" && (
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl space-y-1">
+                  <div className="flex items-center gap-2 font-bold text-emerald-800">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>CPA/EA Review Completed</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-700">
+                    Your tax return has been examined by {proReviewCase.assignedProfessionalName || "the assigned professional"}.
+                    All findings have been reviewed and reconciled.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Professional Review Modal */}
+      <ProfessionalReviewModal
+        isOpen={isProModalOpen}
+        onClose={() => setIsProModalOpen(false)}
+        session={session}
+        onLeadCreated={() => {
+          fetchProReviewCase();
+        }}
+      />
     </div>
   );
 }

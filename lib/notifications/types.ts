@@ -36,6 +36,13 @@ export type NotificationType =
   // Professional CPA/EA Handoff
   | "professional_handoff_submitted"
   | "professional_handoff_status_changed"
+  | "professional_review_requested"
+  | "professional_review_assigned"
+  | "professional_review_in_progress"
+  | "professional_review_comment"
+  | "professional_review_changes_needed"
+  | "professional_review_resubmitted"
+  | "professional_review_completed"
   // Support Center (Phase 5 Step 16)
   | "support_ticket_created"
   | "support_ticket_reply"

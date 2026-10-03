@@ -242,6 +242,43 @@ export class TaxPreparationSessionStore {
   }
 
   /**
+   * Retrieves a tax preparation session by its unique ID.
+   * If userId is provided, validates caller ownership.
+   */
+  public static async getById(
+    sessionId: string,
+    userId?: string
+  ): Promise<TaxPreparationSession | null> {
+    if (SUPABASE_CONFIG.isConfigured()) {
+      try {
+        const supabase = getServerSupabaseClient() as unknown as {
+          from: (tbl: string) => {
+            select: (cols: string) => {
+              eq: (col: string, val: string) => {
+                single: () => Promise<{ data: PreparationSessionRow | null; error: unknown }>;
+              };
+            };
+          };
+        };
+        const res = await supabase
+          .from("tax_preparation_sessions")
+          .select("*")
+          .eq("id", sessionId)
+          .single();
+        if (res.data) {
+          if (userId && res.data.user_id !== userId) return null;
+          return fromRow(res.data);
+        }
+      } catch (_e) {}
+    }
+
+    const session = getMemoryStore().get(sessionId);
+    if (!session) return null;
+    if (userId && session.userId !== userId) return null;
+    return toPublic(session);
+  }
+
+  /**
    * Starts a preparation session or resumes the existing open one.
    */
   public static async start(

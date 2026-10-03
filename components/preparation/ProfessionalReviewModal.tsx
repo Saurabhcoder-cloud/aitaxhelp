@@ -137,6 +137,21 @@ export function ProfessionalReviewModal({
         throw new Error(json.message || "Failed to submit professional review request.");
       }
 
+      // Also create canonical Phase 8 ProfessionalReviewCase
+      try {
+        await fetch("/api/v1/tax/preparation/session/professional-review", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: session.id,
+            reviewType,
+            taxpayerNotes: message.trim() || undefined,
+          }),
+        });
+      } catch (_caseErr) {
+        // Fallback gracefully if case creation encountered non-fatal issue
+      }
+
       setSubmittedLead(json.data);
       if (onLeadCreated) {
         onLeadCreated(json.data);
