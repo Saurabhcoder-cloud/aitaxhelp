@@ -230,6 +230,15 @@ export function getFinalReturnSnapshot(sessionId: string): FinalReturnSnapshot |
 }
 
 /**
+ * Invalidates and removes the frozen snapshot for a given session.
+ * Used when a user modifies income, household, or deduction data post-freeze,
+ * preventing stale submissions.
+ */
+export function invalidateFinalReturnSnapshot(sessionId: string): boolean {
+  return snapshotRegistry.delete(sessionId);
+}
+
+/**
  * Clears the snapshot registry (used in test setup).
  */
 export function clearSnapshotRegistry(): void {

@@ -48,6 +48,7 @@ import {
 import { StateTaxReviewPanel } from "@/components/preparation/StateTaxReviewPanel";
 import { ProfessionalReviewModal } from "@/components/preparation/ProfessionalReviewModal";
 import { ProfessionalReviewCase } from "@/lib/professional/types";
+import { EfileSubmissionSection } from "@/components/preparation/EfileSubmissionSection";
 
 interface FederalReturnReviewPanelProps {
   session: TaxPreparationSession;
@@ -1112,6 +1113,14 @@ export function FederalReturnReviewPanel({
                 </div>
               )}
             </div>
+
+            {/* E-File Submission & Provider Transmission (Phase 10) */}
+            <EfileSubmissionSection
+              session={session}
+              federalReturn={federalReturn}
+              frozenSnapshot={frozenSnapshot}
+              proReviewCase={proReviewCase}
+            />
           </CardContent>
         )}
       </Card>

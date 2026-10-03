@@ -1,7 +1,7 @@
 import { AppError } from "@/lib/utils/errors";
 
 // =============================================================================
-// 1. SUBMISSION LIFECYCLE STATUSES
+// 1. SUBMISSION LIFECYCLE STATUSES (Phase 6 + Phase 10 Extended)
 // =============================================================================
 
 export type SubmissionLifecycleStatus =
@@ -9,9 +9,12 @@ export type SubmissionLifecycleStatus =
   | "READY_FOR_REVIEW"
   | "READY_TO_SUBMIT"
   | "SUBMISSION_PENDING"
+  | "SUBMITTING"
   | "SUBMITTED"
+  | "ACKNOWLEDGED"
   | "ACCEPTED"
   | "REJECTED"
+  | "FAILED"
   | "CANCELLED";
 
 export interface LifecycleStatusDescriptor {
@@ -54,10 +57,24 @@ export const LIFECYCLE_STATUS_DESCRIPTORS: Record<
     isExternalState: false,
     canEditReturn: false,
   },
+  SUBMITTING: {
+    status: "SUBMITTING",
+    label: "Transmitting",
+    description: "Return snapshot is actively transmitting to external authorized provider.",
+    isExternalState: false,
+    canEditReturn: false,
+  },
   SUBMITTED: {
     status: "SUBMITTED",
     label: "Transmitted to IRS",
     description: "Return transmitted to IRS Modernized e-File (MeF); awaiting official acknowledgment.",
+    isExternalState: true,
+    canEditReturn: false,
+  },
+  ACKNOWLEDGED: {
+    status: "ACKNOWLEDGED",
+    label: "Acknowledged by Provider",
+    description: "Transmission received and acknowledged by provider; awaiting final IRS MeF determination.",
     isExternalState: true,
     canEditReturn: false,
   },
@@ -73,6 +90,13 @@ export const LIFECYCLE_STATUS_DESCRIPTORS: Record<
     label: "Rejected by IRS",
     description: "IRS MeF rejected return with specific business rule failure codes.",
     isExternalState: true,
+    canEditReturn: true,
+  },
+  FAILED: {
+    status: "FAILED",
+    label: "Transmission Failed",
+    description: "Network or provider error prevented submission. Return can be safely retried.",
+    isExternalState: false,
     canEditReturn: true,
   },
   CANCELLED: {
@@ -94,11 +118,14 @@ const ALLOWED_TRANSITIONS: Record<
 > = {
   DRAFT: ["READY_FOR_REVIEW", "CANCELLED"],
   READY_FOR_REVIEW: ["DRAFT", "READY_TO_SUBMIT", "CANCELLED"],
-  READY_TO_SUBMIT: ["READY_FOR_REVIEW", "SUBMISSION_PENDING", "CANCELLED"],
-  SUBMISSION_PENDING: ["SUBMITTED", "CANCELLED"],
-  SUBMITTED: ["ACCEPTED", "REJECTED"],
+  READY_TO_SUBMIT: ["READY_FOR_REVIEW", "SUBMISSION_PENDING", "SUBMITTING", "CANCELLED"],
+  SUBMISSION_PENDING: ["SUBMITTING", "SUBMITTED", "FAILED", "CANCELLED"],
+  SUBMITTING: ["SUBMITTED", "ACCEPTED", "REJECTED", "FAILED", "CANCELLED"],
+  SUBMITTED: ["ACKNOWLEDGED", "ACCEPTED", "REJECTED", "FAILED"],
+  ACKNOWLEDGED: ["ACCEPTED", "REJECTED", "FAILED"],
   ACCEPTED: [], // Terminal state for original return
   REJECTED: ["DRAFT", "READY_FOR_REVIEW", "CANCELLED"],
+  FAILED: ["READY_TO_SUBMIT", "SUBMISSION_PENDING", "SUBMITTING", "CANCELLED"],
   CANCELLED: ["DRAFT"],
 };
 
@@ -125,7 +152,7 @@ export function validateLifecycleTransition(
   }
 
   // 2. Enforce external provider prerequisite
-  // External states (SUBMITTED, ACCEPTED, REJECTED) require an active external transmitter
+  // External states (SUBMITTED, ACKNOWLEDGED, ACCEPTED, REJECTED) require an active external transmitter
   const descriptor = LIFECYCLE_STATUS_DESCRIPTORS[target];
   if (descriptor.isExternalState && !isProviderConnected) {
     return {

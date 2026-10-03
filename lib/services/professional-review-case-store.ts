@@ -80,6 +80,19 @@ export class ProfessionalReviewCaseStore {
     events.clear();
   }
 
+  public static clear(): void {
+    this.clearStore();
+  }
+
+  public static updateCaseStatusForTesting(caseId: string, status: ProfessionalReviewCaseStatus): void {
+    const { cases } = getMemoryStore();
+    const c = cases.get(caseId);
+    if (c) {
+      c.status = status;
+      cases.set(caseId, c);
+    }
+  }
+
   /**
    * Builds an authoritative, server-derived snapshot of the taxpayer's tax return.
    * INVARIANT: Never trusts client-supplied calculated numbers.

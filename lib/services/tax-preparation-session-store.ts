@@ -35,6 +35,7 @@ import {
 } from "@/lib/preparation/steps";
 import { executePreparationCalculation } from "@/lib/preparation/calculation";
 import { ImportCalculatorSessionInput } from "@/lib/validations/preparation-session";
+import { invalidateFinalReturnSnapshot } from "@/lib/preparation/final-return-snapshot";
 
 export interface TaxPreparationSession {
   id: string;
@@ -686,13 +687,7 @@ export class TaxPreparationSessionStore {
       updatedAt: new Date().toISOString(),
     };
 
-    if (SUPABASE_CONFIG.isConfigured()) {
-      const saved = await this.updateDatabase(updated);
-      return fromRow(saved);
-    }
-
-    getMemoryStore().set(updated.id, updated);
-    return toPublic(updated);
+    return this.persist(updated);
   }
 
   /**
@@ -865,6 +860,7 @@ export class TaxPreparationSessionStore {
   }
 
   private static async persist(updated: TaxPreparationSession): Promise<TaxPreparationSession> {
+    invalidateFinalReturnSnapshot(updated.id);
     if (SUPABASE_CONFIG.isConfigured()) {
       const saved = await this.updateDatabase(updated);
       return fromRow(saved);
