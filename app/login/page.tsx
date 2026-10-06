@@ -15,10 +15,12 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { getSafeRedirectUrl } from "@/lib/utils/redirect";
+import { useI18n } from "@/lib/i18n";
 
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useI18n();
   const rawNext = searchParams.get("next") || searchParams.get("redirectTo");
   const redirectTo = getSafeRedirectUrl(rawNext, "/dashboard");
 
@@ -32,11 +34,11 @@ function LoginContent() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
-      setErrorMessage("Please enter your email address.");
+      setErrorMessage(t("auth.emailRequired"));
       return;
     }
     if (!password) {
-      setErrorMessage("Please enter your password.");
+      setErrorMessage(t("auth.passwordRequired"));
       return;
     }
 
@@ -64,7 +66,7 @@ function LoginContent() {
         router.refresh();
       }, 500);
     } catch (_err) {
-      setErrorMessage("Failed to sign in. Please check your credentials and try again.");
+      setErrorMessage(t("auth.authFailed"));
       setIsLoading(false);
     }
   };
@@ -93,10 +95,10 @@ function LoginContent() {
             </span>
           </Link>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-surface-900 tracking-tight">
-            Welcome back
+            {t("auth.welcomeBack") || "Welcome back"}
           </h1>
           <p className="text-sm text-surface-600 mt-1.5">
-            Sign in to continue your TaxAIHelp experience.
+            {t("auth.signInSubtitle") || "Sign in to continue your TaxAIHelp experience."}
           </p>
         </div>
 
@@ -129,7 +131,7 @@ function LoginContent() {
                 htmlFor="loginEmail"
                 className="block text-xs font-semibold uppercase tracking-wider text-surface-700"
               >
-                Email Address
+                {t("auth.emailLabel") || "Email Address"}
               </label>
               <div className="relative">
                 <input
@@ -139,7 +141,7 @@ function LoginContent() {
                   autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
+                  placeholder={t("auth.emailPlaceholder")}
                   disabled={isLoading}
                   required
                   className="w-full h-11 pl-9 pr-3.5 rounded-xl border border-surface-300 bg-white text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all disabled:bg-surface-50 disabled:cursor-not-allowed"
@@ -155,13 +157,13 @@ function LoginContent() {
                   htmlFor="loginPassword"
                   className="block text-xs font-semibold uppercase tracking-wider text-surface-700"
                 >
-                  Password
+                  {t("auth.passwordLabel") || "Password"}
                 </label>
                 <Link
                   href="/forgot-password"
                   className="text-xs font-medium text-brand-600 hover:text-brand-800 transition-colors"
                 >
-                  Forgot password?
+                  {t("auth.forgotPasswordPrompt") || "Forgot password?"}
                 </Link>
               </div>
               <div className="relative">
@@ -198,11 +200,11 @@ function LoginContent() {
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Signing in...</span>
+                  <span>{t("auth.signingIn")}</span>
                 </>
               ) : (
                 <>
-                  <span>Sign In</span>
+                  <span>{t("auth.signInButton") || "Sign In"}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -211,12 +213,12 @@ function LoginContent() {
 
           {/* Create Account Switch */}
           <div className="mt-6 pt-5 border-t border-surface-100 text-center text-xs text-surface-500">
-            Don&apos;t have an account?{" "}
+            {t("auth.noAccountPrompt")}{" "}
             <Link
               href={rawNext ? `/signup?next=${encodeURIComponent(rawNext)}` : "/signup"}
               className="font-semibold text-brand-600 hover:text-brand-800 transition-colors"
             >
-              Create Account
+              {t("auth.createAccountButton") || "Create Account"}
             </Link>
           </div>
         </div>

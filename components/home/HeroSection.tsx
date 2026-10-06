@@ -1,11 +1,16 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
 import { Container } from "../ui/Container";
 import { Button } from "../ui/Button";
 import { Badge } from "../ui/Badge";
 import { ArrowRight, Calculator } from "lucide-react";
+import { useI18n } from "../../lib/i18n";
 
 export function HeroSection() {
+  const { t } = useI18n();
+
   return (
     <div className="relative overflow-hidden bg-gradient-to-b from-surface-50 via-white to-surface-50/50 pt-8 pb-12 sm:pt-12 sm:pb-16 lg:pt-14 lg:pb-16 border-b border-surface-200">
       {/* Subtle background radial accent */}
@@ -17,15 +22,15 @@ export function HeroSection() {
       <Container size="xl" className="text-center">
         {/* Main Headline */}
         <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-surface-900 tracking-tight leading-[1.15] max-w-4xl mx-auto">
-          Smarter Tax Help,{" "}
+          {t("home.heroHeadlinePrefix")}
           <span className="bg-gradient-to-r from-brand-600 to-navy-900 bg-clip-text text-transparent">
-            Powered by AI
+            {t("home.heroHeadlineHighlight")}
           </span>
         </h1>
 
         {/* Supporting Message */}
         <p className="mt-4 sm:mt-5 text-base sm:text-lg lg:text-xl text-surface-700 max-w-2xl mx-auto leading-relaxed">
-          Understand your federal taxes, identify eligible deductions, and receive clear explanations through a guided tax preparation experience. Powered by deterministic calculations and verified IRS formulas.
+          {t("home.heroSubtitle")}
         </p>
 
         {/* Primary and Secondary CTAs */}
@@ -35,7 +40,7 @@ export function HeroSection() {
             size="lg"
             className="w-full sm:w-auto shadow-md hover:shadow-lg transition-all font-semibold px-7"
           >
-            <span>Start My Taxes</span>
+            <span>{t("home.startMyTaxesCta")}</span>
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
 
@@ -46,7 +51,7 @@ export function HeroSection() {
             className="w-full sm:w-auto font-medium px-6"
           >
             <Calculator className="w-4 h-4 mr-2 text-surface-600" />
-            <span>Explore Tax Calculators</span>
+            <span>{t("home.exploreCalculatorsCta")}</span>
           </Button>
         </div>
 
@@ -54,10 +59,10 @@ export function HeroSection() {
         <div className="mt-6 sm:mt-7 flex flex-wrap items-center justify-center gap-2 sm:gap-3">
           <Badge variant="brand" size="md" className="py-1 px-3 font-medium">
             <span className="w-2 h-2 rounded-full bg-brand-500 mr-1.5 animate-pulse" />
-            2025 / 2026 Federal Tax Engine
+            {t("home.badgeEngine")}
           </Badge>
           <span className="text-xs font-semibold text-surface-600">
-            IRS IRB 2025-45 &amp; Rev. Proc. 2025-32 Verified
+            {t("home.irbVerified")}
           </span>
         </div>
 

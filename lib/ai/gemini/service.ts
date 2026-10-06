@@ -1,5 +1,5 @@
 import { callGeminiApi, isGeminiAvailable } from "./client";
-import { SYSTEM_PROMPTS } from "./prompts";
+import { SYSTEM_PROMPTS, getLocalizedSystemPrompt } from "./prompts";
 import {
   calculateIncomeTax,
   calculateSelfEmployedTax,
@@ -855,7 +855,10 @@ export async function processAssistantRequest(
           `2. Keep the three pillars distinct: Calculated Result (engine), AI Explanation (educational only), and Professional Review (recommend licensed CPA/EA for uncertain situations).\n` +
           `3. Answer the user's question directly with educational clarity.\n`;
 
-        explanation = await callGeminiApi(SYSTEM_PROMPTS.taxExplainer, prompt);
+        explanation = await callGeminiApi(
+          getLocalizedSystemPrompt("taxExplainer", request.locale),
+          prompt
+        );
         if (!explanation || explanation.startsWith("I am your TaxAIHelp educational assistant")) {
           explanation = buildPreparationSessionDeterministicReply(session, request.message);
         }
@@ -971,7 +974,10 @@ export async function processAssistantRequest(
         `3. If the user asks about unsupported items (state taxes, itemized deductions on Schedule A, energy credits, complex retirement accounts), explicitly state they are outside the current calculator's scope and suggest consulting a licensed CPA or EA.\n` +
         `4. Do not promise or guarantee tax savings or refunds.`;
 
-      explanation = await callGeminiApi(SYSTEM_PROMPTS.taxExplainer, prompt);
+      explanation = await callGeminiApi(
+        getLocalizedSystemPrompt("taxExplainer", request.locale),
+        prompt
+      );
     } catch (_err) {
       explanation = buildDeterministicSummary(
         res,
@@ -1122,7 +1128,10 @@ export async function processAssistantRequest(
           `3. If the user asks about unsupported items (state taxes, itemized deductions on Schedule A, energy credits, complex retirement accounts), explicitly state they are outside the current calculator's scope and suggest consulting a licensed CPA or EA.\n` +
           `4. Do not promise or guarantee tax savings or refunds.`;
 
-        explanation = await callGeminiApi(SYSTEM_PROMPTS.taxExplainer, prompt);
+        explanation = await callGeminiApi(
+          getLocalizedSystemPrompt("taxExplainer", request.locale),
+          prompt
+        );
       } catch (_err) {
         explanation = buildDeterministicSummary(
           verifiedCalculation,
@@ -1182,7 +1191,10 @@ export async function processAssistantRequest(
       ? `\nTaxpayer Profile Baseline Context (educational reference only, do not assume facts not asked): Default Tax Year: ${userTaxProfile.defaultTaxYear}, Filing Status: ${userTaxProfile.filingStatus}.`
       : "";
     const prompt = `User question: "${request.message}"${profileContext}\nProvide a clear, accurate, educational response based on standard US federal tax rules.`;
-    generalAnswer = await callGeminiApi(SYSTEM_PROMPTS.taxExplainer, prompt);
+    generalAnswer = await callGeminiApi(
+      getLocalizedSystemPrompt("taxExplainer", request.locale),
+      prompt
+    );
   } catch (_err) {
     const year = userTaxProfile?.defaultTaxYear || 2025;
     const stdDeduction =

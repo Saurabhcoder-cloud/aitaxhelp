@@ -11,6 +11,7 @@ export interface MetadataOptions {
   modifiedTime?: string;
   authors?: string[];
   canonicalUrl?: string;
+  locale?: string;
 }
 
 /**
@@ -49,7 +50,7 @@ export function sanitizeCanonicalUrl(pathOrUrl: string): string {
 }
 
 /**
- * Constructs standard, accessible, and canonical SEO metadata for Next.js pages.
+ * Constructs standard, accessible, canonical and multilingual SEO metadata for Next.js pages.
  */
 export function constructMetadata({
   title,
@@ -61,19 +62,21 @@ export function constructMetadata({
   modifiedTime,
   authors,
   canonicalUrl,
+  locale = "en",
 }: MetadataOptions = {}): Metadata {
   const fullTitle = title
     ? `${title} | ${SITE_CONFIG.name}`
     : `${SITE_CONFIG.name} — ${SITE_CONFIG.tagline}`;
 
   const canonical = sanitizeCanonicalUrl(canonicalUrl || path);
+  const ogLocale = locale === "es" ? "es_US" : "en_US";
 
   const baseOpenGraph = {
     title: fullTitle,
     description,
     url: noIndex ? undefined : canonical,
     siteName: SITE_CONFIG.name,
-    locale: "en_US",
+    locale: ogLocale,
     images: [
       {
         url: `${SITE_CONFIG.canonicalDomain}/images/og-image.png`,
@@ -106,6 +109,17 @@ export function constructMetadata({
       ? undefined
       : {
           canonical,
+          languages: {
+            "en": `${canonical}?lang=en`,
+            "es": `${canonical}?lang=es`,
+            "zh": `${canonical}?lang=zh`,
+            "vi": `${canonical}?lang=vi`,
+            "ko": `${canonical}?lang=ko`,
+            "ru": `${canonical}?lang=ru`,
+            "pt": `${canonical}?lang=pt`,
+            "tl": `${canonical}?lang=tl`,
+            "x-default": canonical,
+          },
         },
     openGraph,
     twitter: {

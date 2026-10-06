@@ -9,10 +9,13 @@ import { Badge } from "../ui/Badge";
 import { MobileNav } from "./MobileNav";
 import { checkSession, signOut, ClientUserSession } from "../../lib/utils/auth-client";
 import { LogOut, User } from "lucide-react";
+import { useI18n } from "../../lib/i18n";
+import { LanguageSelector } from "../shared/LanguageSelector";
 
 export function Header() {
   const router = useRouter();
   const pathname = usePathname();
+  const { t } = useI18n();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
@@ -86,7 +89,7 @@ export function Header() {
                 TaxAI<span className="text-brand-600">Help</span>
               </span>
               <span className="text-[10px] uppercase font-bold tracking-wider text-surface-600 hidden sm:inline whitespace-nowrap">
-                US Tax Intelligence
+                {t("common.usTaxIntelligence")}
               </span>
             </div>
           </Link>
@@ -155,6 +158,8 @@ export function Header() {
 
         {/* Right CTA Area */}
         <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+          <LanguageSelector variant="header" />
+
           {isAuthenticated ? (
             /* Authenticated Navigation Items */
             <>
@@ -167,7 +172,7 @@ export function Header() {
                 }`}
               >
                 <User className="w-3.5 h-3.5 text-surface-400" />
-                <span>Dashboard</span>
+                <span>{t("nav.dashboard")}</span>
               </Link>
 
               <Button
@@ -175,18 +180,18 @@ export function Header() {
                 size="sm"
                 className="hidden sm:inline-flex shadow-sm whitespace-nowrap font-medium"
               >
-                Calculate Your Taxes
+                {t("nav.calculateYourTaxes")}
               </Button>
 
               <button
                 type="button"
                 onClick={handleSignOut}
                 className="hidden md:inline-flex items-center gap-1 text-xs font-medium text-surface-500 hover:text-surface-900 px-2 py-1.5 rounded-lg hover:bg-surface-100 transition-colors whitespace-nowrap cursor-pointer"
-                title="Sign out of current account"
-                aria-label="Sign out"
+                title={t("nav.signOut")}
+                aria-label={t("nav.signOut")}
               >
                 <LogOut className="w-3.5 h-3.5 text-surface-400" />
-                <span>Sign Out</span>
+                <span>{t("nav.signOut")}</span>
               </button>
             </>
           ) : (
@@ -200,7 +205,7 @@ export function Header() {
                     : "text-surface-700 hover:text-brand-600 hover:bg-surface-50"
                 }`}
               >
-                Sign In
+                {t("nav.signIn")}
               </Link>
 
               <Button
@@ -208,7 +213,7 @@ export function Header() {
                 size="sm"
                 className="hidden sm:inline-flex shadow-sm whitespace-nowrap font-medium"
               >
-                Calculate Your Taxes
+                {t("nav.calculateYourTaxes")}
               </Button>
             </>
           )}

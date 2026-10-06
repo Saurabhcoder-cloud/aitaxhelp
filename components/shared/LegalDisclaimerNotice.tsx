@@ -1,24 +1,36 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
 import { Alert } from "../ui/Alert";
+import { useI18n } from "../../lib/i18n";
 
 export function LegalDisclaimerNotice({ compact = false }: { compact?: boolean }) {
+  const { t, locale } = useI18n();
+
   if (compact) {
     return (
       <div className="text-xs text-surface-600 bg-surface-50 border border-surface-200 rounded-lg p-3 leading-relaxed">
-        <span className="font-semibold text-surface-800">Educational Notice:</span> All calculations are deterministic estimates for educational purposes. TaxAIHelp is not affiliated with the IRS or any government agency. Consult a certified CPA or EA.{" "}
+        <span className="font-semibold text-surface-800">
+          {locale === "es" ? "Aviso Informativo: " : "Educational Notice: "}
+        </span>
+        {t("footer.disclaimerText")}{" "}
         <Link href="/disclaimer" className="text-brand-600 hover:underline">
-          Read full disclaimer
+          {t("footer.disclaimer")}
         </Link>
       </div>
     );
   }
 
   return (
-    <Alert variant="info" title="Educational Tax Estimation Notice" className="my-6">
-      TaxAIHelp calculations are deterministic estimates based on standard IRS federal tax formulas. They are designed to help you understand your general tax obligations and deductions. TaxAIHelp is not an IRS-endorsed service, and our calculations do not replace certified CPA or Enrolled Agent filing reviews. Unsupported tax scenarios (such as complex foreign income or specialty state tax credits) must be evaluated with a qualified tax professional.{" "}
+    <Alert
+      variant="info"
+      title={locale === "es" ? "Aviso Informativo de Estimación Fiscal" : "Educational Tax Estimation Notice"}
+      className="my-6"
+    >
+      {t("footer.disclaimerText")}{" "}
       <Link href="/disclaimer" className="font-semibold text-brand-700 underline ml-1">
-        Learn more about our standards
+        {locale === "es" ? "Conozca más sobre nuestros estándares" : "Learn more about our standards"}
       </Link>
       .
     </Alert>

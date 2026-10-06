@@ -16,6 +16,7 @@ export interface UserProfile {
   email: string;
   fullName: string | null;
   role?: UserRole;
+  preferredLanguage?: string;
   createdAt: string;
   updatedAt: string;
 }

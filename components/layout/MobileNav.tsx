@@ -7,6 +7,8 @@ import { MAIN_NAV_ITEMS } from "../../lib/constants/navigation";
 import { Button } from "../ui/Button";
 import { ClientUserSession } from "../../lib/utils/auth-client";
 import { LogOut, User, ShieldCheck } from "lucide-react";
+import { useI18n } from "../../lib/i18n";
+import { LanguageSelector } from "../shared/LanguageSelector";
 
 interface MobileNavProps {
   isOpen: boolean;
@@ -17,6 +19,7 @@ interface MobileNavProps {
 
 export function MobileNav({ isOpen, onClose, session, onSignOut }: MobileNavProps) {
   const pathname = usePathname();
+  const { t } = useI18n();
   if (!isOpen) return null;
 
   const isAuthenticated = Boolean(session && session.id);
@@ -83,13 +86,18 @@ export function MobileNav({ isOpen, onClose, session, onSignOut }: MobileNavProp
               </div>
             ))}
 
+            {/* Language Selector in Mobile Drawer */}
+            <div className="pt-3 border-t border-surface-100">
+              <LanguageSelector variant="mobile" />
+            </div>
+
             {/* Auth-Aware Navigation Links */}
             <div className="pt-3 border-t border-surface-100 flex flex-col space-y-2.5">
               {isAuthenticated ? (
                 <>
                   <div className="text-xs font-semibold uppercase tracking-wider text-surface-400 flex items-center gap-1.5 mb-1">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Taxpayer Account</span>
+                    <span>{t("nav.taxpayerAccount")}</span>
                   </div>
                   <Link
                     href="/dashboard"
@@ -101,14 +109,14 @@ export function MobileNav({ isOpen, onClose, session, onSignOut }: MobileNavProp
                     }`}
                   >
                     <User className="w-4 h-4 text-brand-600" />
-                    <span>Dashboard &amp; Settings</span>
+                    <span>{t("nav.dashboard")}</span>
                   </Link>
                   <Link
                     href="/dashboard/taxes"
                     onClick={onClose}
                     className="text-sm font-medium text-surface-700 hover:text-brand-600 transition-colors pl-6"
                   >
-                    Start / Continue Taxes
+                    {t("nav.startMyTaxes")}
                   </Link>
                   <button
                     type="button"
@@ -121,7 +129,7 @@ export function MobileNav({ isOpen, onClose, session, onSignOut }: MobileNavProp
                     className="flex items-center gap-2 text-sm font-medium text-surface-600 hover:text-red-600 transition-colors text-left pt-1 cursor-pointer"
                   >
                     <LogOut className="w-4 h-4 text-surface-400" />
-                    <span>Sign Out</span>
+                    <span>{t("nav.signOut")}</span>
                   </button>
                 </>
               ) : (
@@ -135,14 +143,14 @@ export function MobileNav({ isOpen, onClose, session, onSignOut }: MobileNavProp
                         : "text-brand-700 hover:text-brand-900"
                     }`}
                   >
-                    Sign In →
+                    {t("nav.signIn")} →
                   </Link>
                   <Link
                     href="/signup"
                     onClick={onClose}
                     className="text-sm font-medium text-surface-600 hover:text-surface-900 transition-colors"
                   >
-                    Create Account
+                    {t("nav.createAccount")}
                   </Link>
                 </>
               )}
@@ -158,7 +166,7 @@ export function MobileNav({ isOpen, onClose, session, onSignOut }: MobileNavProp
             size="md"
             className="w-full font-medium shadow-sm"
           >
-            Calculate Your Taxes
+            {t("nav.calculateYourTaxes")}
           </Button>
           <Button
             href="/ai-tax-assistant"
@@ -167,7 +175,7 @@ export function MobileNav({ isOpen, onClose, session, onSignOut }: MobileNavProp
             size="md"
             className="w-full font-medium"
           >
-            Ask AI Assistant
+            {t("nav.aiTaxAssistant")}
           </Button>
         </div>
       </div>

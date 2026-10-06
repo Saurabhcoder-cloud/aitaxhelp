@@ -16,10 +16,12 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { getSafeRedirectUrl } from "@/lib/utils/redirect";
+import { useI18n } from "@/lib/i18n";
 
 function SignupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useI18n();
   const rawNext = searchParams.get("next") || searchParams.get("redirectTo");
   const redirectTo = getSafeRedirectUrl(rawNext, "/dashboard");
 
@@ -38,17 +40,17 @@ function SignupContent() {
     setErrorMessage(null);
 
     if (!email.trim()) {
-      setErrorMessage("Please enter your email address.");
+      setErrorMessage(t("auth.emailRequired"));
       return;
     }
 
     if (password.length < 8) {
-      setErrorMessage("Password must be at least 8 characters long.");
+      setErrorMessage(t("auth.passwordRequired"));
       return;
     }
 
     if (password !== confirmPassword) {
-      setErrorMessage("Passwords do not match. Please re-enter.");
+      setErrorMessage(t("auth.passwordMismatch"));
       return;
     }
 
@@ -122,10 +124,10 @@ function SignupContent() {
             </span>
           </Link>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-surface-900 tracking-tight">
-            Create your account
+            {t("auth.createAccountTitle") || "Create your account"}
           </h1>
           <p className="text-sm text-surface-600 mt-1.5">
-            Start your guided tax preparation with TaxAIHelp.
+            {t("auth.createAccountSubtitle") || "Start your guided tax preparation with TaxAIHelp."}
           </p>
         </div>
 

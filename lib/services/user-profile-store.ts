@@ -93,11 +93,11 @@ export class UserProfileStore {
   }
 
   /**
-   * Updates display name (fullName) for the authenticated user.
+   * Updates display name (fullName) or preferred language for the authenticated user.
    */
   public static async updateProfile(
     userId: string,
-    data: { fullName?: string | null }
+    data: { fullName?: string | null; preferredLanguage?: string }
   ): Promise<UserProfile> {
     const current = await this.getProfile(userId);
     const now = new Date().toISOString();
@@ -105,6 +105,7 @@ export class UserProfileStore {
     const updated: UserProfile = {
       ...current,
       fullName: data.fullName !== undefined ? data.fullName : current.fullName,
+      preferredLanguage: data.preferredLanguage !== undefined ? data.preferredLanguage : current.preferredLanguage,
       updatedAt: now,
     };
 
@@ -121,6 +122,7 @@ export class UserProfileStore {
         .from("profiles")
         .update({
           full_name: updated.fullName,
+          preferred_language: updated.preferredLanguage,
           updated_at: now,
         })
         .eq("id", userId);

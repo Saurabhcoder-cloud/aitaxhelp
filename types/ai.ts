@@ -39,6 +39,7 @@ export interface AIAssistantRequest {
   sessionId?: string;
   conversationId?: string;
   userId?: string;
+  locale?: string;
   context?: Record<string, unknown>;
 }
 
@@ -83,6 +84,7 @@ export interface AIExplanationRequest {
     filingStatus: string;
     taxYear: number;
   };
+  locale?: string;
 }
 
 export interface AIExplanationResponse {

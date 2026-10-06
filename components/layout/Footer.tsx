@@ -1,9 +1,14 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
 import { FOOTER_SECTIONS } from "../../lib/constants/navigation";
+import { useI18n } from "../../lib/i18n";
+import { LanguageSelector } from "../shared/LanguageSelector";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
+  const { t } = useI18n();
 
   return (
     <footer className="bg-navy-950 text-surface-300 border-t border-navy-900 pt-16 pb-12">
@@ -20,12 +25,12 @@ export function Footer() {
               </span>
             </Link>
             <p className="mt-3 text-sm text-surface-400 max-w-sm leading-relaxed">
-              AI explains. The tax engine calculates. Comprehensive tax navigation, preparation, deterministic IRS calculation, and licensed professional escalation for US taxpayers.
+              {t("footer.tagline")}
             </p>
-            <div className="mt-6 flex items-center gap-3 text-xs text-surface-400">
+            <div className="mt-6 flex flex-wrap items-center gap-3 text-xs text-surface-400">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-navy-900 border border-surface-800 text-surface-300">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                IRS IRB 2025-45 & Rev. Proc. 2025-32 Verified
+                {t("common.officialIrsVerifiedNotice")}
               </span>
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-navy-900 border border-surface-800 text-surface-300">
                 Deterministic Engine v1.1
@@ -58,20 +63,21 @@ export function Footer() {
         {/* Regulatory & Safety Disclaimer */}
         <div className="mt-8 pt-6 text-xs text-surface-400 leading-relaxed border-t border-navy-900/60">
           <p className="font-semibold text-surface-300 mb-1">
-            Important Compliance & Legal Disclaimer:
+            {t("footer.complianceNotice")}
           </p>
           <p>
-            TaxAIHelp is an independent educational and estimation platform. TaxAIHelp is not endorsed by, sponsored by, or affiliated with the Internal Revenue Service (IRS) or any state or federal governmental taxing authority. All calculations produced by this platform are deterministic estimates intended solely for informational and educational purposes based on standard federal formulas. Tax outcomes vary based on individual circumstances, local laws, and supporting documentation. TaxAIHelp does not provide official legal, investment, or certified CPA advice. Users should verify critical tax matters with a licensed Certified Public Accountant (CPA) or Enrolled Agent (EA).
+            {t("footer.disclaimerText")}
           </p>
         </div>
 
-        {/* Copyright */}
+        {/* Copyright & Language Selector */}
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-surface-400 gap-4">
-          <p>© {currentYear} TaxAIHelp. All rights reserved. taxaihelp.com</p>
-          <div className="flex items-center gap-6">
-            <Link href="/privacy" className="hover:text-surface-300">Privacy Policy</Link>
-            <Link href="/terms" className="hover:text-surface-300">Terms of Service</Link>
-            <Link href="/disclaimer" className="hover:text-surface-300">Disclaimer</Link>
+          <p>© {currentYear} TaxAIHelp. {t("footer.allRightsReserved")} taxaihelp.com</p>
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+            <Link href="/privacy" className="hover:text-surface-300">{t("footer.privacyPolicy")}</Link>
+            <Link href="/terms" className="hover:text-surface-300">{t("footer.termsOfService")}</Link>
+            <Link href="/disclaimer" className="hover:text-surface-300">{t("footer.disclaimer")}</Link>
+            <LanguageSelector variant="header" />
           </div>
         </div>
       </div>
